@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>PDFとExcel結合ツール</title>
+    <link rel="icon" href="{{ favicon_url }}">
+</head>
+<body>
+    <h1>PDFとExcel結合ツール</h1>
+    <form method="POST" action="/process" enctype="multipart/form-data">
+        <div>
+            <label for="pdf_file">PDFファイルを選択してください:</label>
+            <input type="file" name="pdf_file" id="pdf_file" required>
+        </div>
+        <br>
+        <div>
+            <label for="excel_file">Excelファイルを選択してください:</label>
+            <input type="file" name="excel_file" id="excel_file" required>
+        </div>
+        <br>
+        <button type="submit">処理開始</button>
+    </form>
+</body>
+</html>
