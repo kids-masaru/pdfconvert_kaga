@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>PDFとExcel結合ツール</title>
+    <!-- ファビコン -->
     <link rel="icon" href="{{ favicon_url }}">
+    <!-- PWA マニフェスト -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#4a90e2">
 </head>
@@ -22,5 +24,8 @@
         <br>
         <button type="submit">処理開始</button>
     </form>
+
+    <!-- Service Worker を登録するスクリプト -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
