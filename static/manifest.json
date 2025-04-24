@@ -2,7 +2,6 @@
   "name":        "PDF Converter Kaga",
   "short_name":  "PDFConv",
   "start_url":   "/",
-  // ★ standalone → browser に変更
   "display":     "browser",
   "background_color": "#ffffff",
   "theme_color":      "#4a90e2",
