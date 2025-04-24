@@ -1,31 +1,94 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>PDFとExcel結合ツール</title>
-    <!-- ファビコン -->
-    <link rel="icon" href="{{ favicon_url }}">
-    <!-- PWA マニフェスト -->
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#4a90e2">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>PDFとExcel結合ツール</title>
+  <!-- PWA マニフェスト -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <!-- ファビコン -->
+  <link rel="icon" href="{{ favicon_url }}">
+  <meta name="theme-color" content="#4a90e2">
+  <style>
+    body { font-family: sans-serif; background: #f2f2f2; margin: 0; padding: 20px; }
+    .header { display: flex; align-items: center; background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .header img { width: 48px; height: 48px; margin-right: 12px; }
+    .header .title { margin: 0; font-size: 1.25rem; }
+    .header .subtitle { margin: 4px 0 0; font-size: 0.875rem; color: #666; }
+    .card { background: #fff; padding: 20px; border: 2px dashed #ccc; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+    .card:hover { border-color: #4a90e2; }
+    .upload-icon { font-size: 2rem; color: #4a90e2; margin-bottom: 12px; }
+    .upload-area h2 { margin: 0; font-size: 1.125rem; }
+    .upload-area p { color: #666; font-size: 0.875rem; }
+    .btn { display: inline-block; margin: 10px 8px; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; }
+    .btn-pdf { background: #fdecea; color: #c0392b; }
+    .btn-excel { background: #e9f7ef; color: #27ae60; }
+    .file-list { list-style: none; padding: 0; margin: 20px 0; }
+    .file-list li { background: #fff; padding: 12px 16px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .file-list li .info { display: flex; align-items: center; }
+    .file-list li .info img { width: 24px; height: 24px; margin-right: 8px; }
+    .file-list li .info .name { font-size: 0.875rem; }
+    .btn-process { width: 100%; padding: 12px; background: #4a90e2; color: #fff; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; }
+    .footer-buttons { text-align: center; margin-top: 20px; }
+    .footer-buttons .btn { margin: 0 4px; background: #fff; color: #333; border: 1px solid #ccc; }
+  </style>
 </head>
 <body>
-    <h1>PDFとExcel結合ツール</h1>
-    <form method="POST" action="/process" enctype="multipart/form-data">
-        <div>
-            <label for="pdf_file">PDFファイルを選択してください:</label>
-            <input type="file" name="pdf_file" id="pdf_file" required>
-        </div>
-        <br>
-        <div>
-            <label for="excel_file">Excelファイルを選択してください:</label>
-            <input type="file" name="excel_file" id="excel_file" required>
-        </div>
-        <br>
-        <button type="submit">処理開始</button>
-    </form>
 
-    <!-- Service Worker を登録するスクリプト -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <header class="header">
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="App Icon">
+    <div>
+      <h1 class="title">Work Hours Web App</h1>
+      <p class="subtitle">Upload your files and process your work hours data</p>
+    </div>
+  </header>
+
+  <div class="card upload-area">
+    <div class="upload-icon">⇪</div>
+    <h2>Upload your files</h2>
+    <p>Drag &amp; drop your PDF and Excel files here, or select them from your device</p>
+    <form method="POST" action="/process" enctype="multipart/form-data">
+      <div>
+        <label class="btn btn-pdf">
+          <input type="file" name="pdf_file" accept=".pdf" style="display:none;" required>
+          Select PDF
+        </label>
+        <label class="btn btn-excel">
+          <input type="file" name="excel_file" accept=".xls,.xlsx" style="display:none;" required>
+          Select Excel
+        </label>
+      </div>
+      <!-- 選択済みファイル表示 (Flask側で値が渡されていれば表示) -->
+      <ul class="file-list">
+        {% if request.files and request.files.pdf_file %}
+        <li>
+          <div class="info">
+            <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="PDF icon">
+            <span class="name">{{ request.files.pdf_file.filename }}</span>
+          </div>
+          <button type="button" class="btn">✕</button>
+        </li>
+        {% endif %}
+        {% if request.files and request.files.excel_file %}
+        <li>
+          <div class="info">
+            <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Excel icon">
+            <span class="name">{{ request.files.excel_file.filename }}</span>
+          </div>
+          <button type="button" class="btn">✕</button>
+        </li>
+        {% endif %}
+      </ul>
+      <button type="submit" class="btn-process">Process Files</button>
+    </form>
+  </div>
+
+  <div class="footer-buttons">
+    <button class="btn">Show Upload</button>
+    <button class="btn">Show Processing</button>
+    <button class="btn">Show Results</button>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
