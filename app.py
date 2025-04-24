@@ -17,7 +17,10 @@ import pdfplumber
 from openpyxl import load_workbook
 from openpyxl.styles import Border, Side
 from openpyxl.utils import get_column_letter
-from win32com import client as win32client  # ExcelからPDF変換用
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from PIL import Image
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -96,34 +99,47 @@ def remove_extra_empty_columns(rows: List[List[str]]) -> List[List[str]]:
     keep = [i for i in range(num_cols) if any(i < len(r) and r[i].strip() for r in rows)]
     return [[r[i] if i < len(r) else "" for i in keep] for r in rows]
 
-# --- ExcelからPDF変換関数 ---
-def excel_to_pdf(excel_data, sheet_name):
+# --- ExcelからPDF変換関数 (win32com不使用版) ---
+def excel_sheet_to_pdf(excel_data, sheet_name):
     # 一時ファイルとして保存
     temp_excel_path = "temp_output.xlsm"
     with open(temp_excel_path, "wb") as f:
         f.write(excel_data)
     
-    # ExcelからPDF変換
-    excel = win32client.Dispatch("Excel.Application")
-    excel.Visible = False
-    try:
-        workbook = excel.Workbooks.Open(os.path.abspath(temp_excel_path))
-        sheet = workbook.Worksheets(sheet_name)
-        temp_pdf_path = "temp_output.pdf"
-        sheet.ExportAsFixedFormat(0, os.path.abspath(temp_pdf_path))
-        workbook.Close(False)
-        
-        # PDFデータを読み込み
-        with open(temp_pdf_path, "rb") as f:
-            pdf_data = f.read()
-        return pdf_data
-    finally:
-        excel.Quit()
-        # 一時ファイル削除
-        if os.path.exists(temp_excel_path):
-            os.remove(temp_excel_path)
-        if os.path.exists(temp_pdf_path):
-            os.remove(temp_pdf_path)
+    # Excelファイルを開く
+    wb = load_workbook(temp_excel_path, read_only=True, data_only=True)
+    
+    # 指定したシートを取得
+    if sheet_name not in wb.sheetnames:
+        raise ValueError(f"シート '{sheet_name}' が見つかりません")
+    
+    ws = wb[sheet_name]
+    
+    # PDF生成
+    pdf_buffer = io.BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=letter)
+    
+    # シートの内容をPDFに描画
+    y_position = 750  # 開始Y位置
+    for row in ws.iter_rows(values_only=True):
+        x_position = 50  # 開始X位置
+        for cell in row:
+            if cell is not None:
+                c.drawString(x_position, y_position, str(cell))
+            x_position += 100  # セル間隔
+        y_position -= 15  # 行間隔
+        if y_position < 50:  # ページ下部に達したら新しいページ
+            c.showPage()
+            y_position = 750
+    
+    c.save()
+    pdf_buffer.seek(0)
+    
+    # 一時ファイル削除
+    if os.path.exists(temp_excel_path):
+        os.remove(temp_excel_path)
+    
+    return pdf_buffer.getvalue()
 
 # --- Excel書き込み関連 ---
 thin_border_side = Side(border_style="thin", color="000000")
@@ -203,7 +219,7 @@ def process_files():
         excel_name = f"Combined_{base}.xlsm"
         
         # 「提出用」シートをPDFに変換
-        pdf_data = excel_to_pdf(excel_data, "提出用")
+        pdf_data = excel_sheet_to_pdf(excel_data, "提出用")
         pdf_name = f"Combined_{base}_提出用.pdf"
         
         # ZIPファイルにまとめてダウンロード
