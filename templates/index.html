@@ -10,38 +10,30 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <!-- Loading Overlay -->
+  <!-- ローディングオーバーレイ -->
   <div id="loading-overlay" class="hidden">
     <div class="spinner"></div>
-    <p>処理中です。しばらくお待ちください…</p>
+    <p id="loading-text">処理中です。しばらくお待ちください… (<span id="progress">0%</span>)</p>
   </div>
 
   <header class="header">
     <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="App Icon">
     <div>
-      <h1 class="title">Work Hours Web App</h1>
-      <p class="subtitle">Upload your files and process your work hours data</p>
+      <h1 class="title">PDFとExcel結合ツール</h1>
+      <p class="subtitle">ファイルをアップロードしてデータを結合</p>
     </div>
   </header>
 
   <div class="card upload-area" id="drop-area">
     <div class="upload-icon">⇪</div>
     <h2>Upload your files</h2>
-    <p>Drag &amp; drop PDF and Excel files here, or select below</p>
-    <form id="upload-form" method="POST" action="/process" enctype="multipart/form-data">
-      <div>
-        <label class="btn btn-pdf">
-          Select PDF
-          <input type="file" name="pdf_file" accept=".pdf" id="pdf-input" style="display:none;" required>
-        </label>
-        <label class="btn btn-excel">
-          Select Excel
-          <input type="file" name="excel_file" accept=".xls,.xlsx" id="excel-input" style="display:none;" required>
-        </label>
-      </div>
-      <ul class="file-list" id="file-list"></ul>
-      <button type="submit" class="btn-process">Process Files</button>
-    </form>
+    <p>PDFとExcelファイルをここにドラッグ＆ドロップ、または以下で選択</p>
+    <div>
+      <label class="btn btn-pdf">PDFを選択<input type="file" id="pdf-input" accept=".pdf" style="display:none;"></label>
+      <label class="btn btn-excel">Excelを選択<input type="file" id="excel-input" accept=".xls,.xlsx" style="display:none;"></label>
+    </div>
+    <ul id="file-list" class="file-list"></ul>
+    <button id="process-btn" class="btn-process">処理開始</button>
   </div>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
