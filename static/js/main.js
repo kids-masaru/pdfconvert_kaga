@@ -1,31 +1,32 @@
 // static/js/main.js
 
 document.addEventListener('DOMContentLoaded', () => {
-  const dropArea = document.getElementById('drop-area');
-  const pdfInput = document.getElementById('pdf-input');
+  const dropArea   = document.getElementById('drop-area');
+  const pdfInput   = document.getElementById('pdf-input');
   const excelInput = document.getElementById('excel-input');
-  const fileList = document.getElementById('file-list');
+  const fileList   = document.getElementById('file-list');
   const processBtn = document.getElementById('process-btn');
-  const loading = document.getElementById('loading-overlay');
-  const progressText = document.getElementById('progress');
+  const loading    = document.getElementById('loading-overlay');
+  const progressEl = document.getElementById('progress');
 
-  let pdfFile = null;
+  let pdfFile   = null;
   let excelFile = null;
+  let fakeProgressTimer;
 
-  // Prevent default drag behaviors
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+  // ドラッグ＆ドロップ時のデフォルト挙動抑制
+  ['dragenter','dragover','dragleave','drop'].forEach(ev => {
     dropArea.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
   });
   dropArea.addEventListener('dragover', () => dropArea.classList.add('highlight'));
   dropArea.addEventListener('dragleave', () => dropArea.classList.remove('highlight'));
 
-  // Handle drop
+  // drop された時
   dropArea.addEventListener('drop', e => {
     dropArea.classList.remove('highlight');
     handleFiles(e.dataTransfer.files);
   });
 
-  // Handle manual select
+  // ファイル選択ボタンから
   pdfInput.addEventListener('change', () => {
     pdfFile = pdfInput.files[0] || null;
     updateFileList();
@@ -35,17 +36,23 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFileList();
   });
 
+  // ファイル判定
   function handleFiles(files) {
     Array.from(files).forEach(f => {
-      if (f.name.toLowerCase().endsWith('.pdf')) pdfFile = f;
-      else if (f.name.toLowerCase().match(/\\.xls/)) excelFile = f;
+      const name = f.name.toLowerCase();
+      if (name.endsWith('.pdf')) {
+        pdfFile = f;
+      } else if (name.endsWith('.xls') || name.endsWith('.xlsx')) {
+        excelFile = f;
+      }
     });
     updateFileList();
   }
 
+  // ファイル一覧描画
   function updateFileList() {
     fileList.innerHTML = '';
-    [ ['PDF', pdfFile], ['Excel', excelFile] ].forEach(([label, file]) => {
+    [['PDF', pdfFile], ['Excel', excelFile]].forEach(([label, file]) => {
       if (file) {
         const li = document.createElement('li');
         li.innerHTML = `
@@ -65,16 +72,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Process
+  // 送信ボタン
   processBtn.addEventListener('click', () => {
     if (!pdfFile || !excelFile) {
       alert('PDFとExcelの両方をアップロードしてください。');
       return;
     }
-    // Show loading
-    loading.classList.remove('hidden');
-    progressText.textContent = '0%';
 
+    // ローディング表示＆プログレス初期化
+    loading.classList.remove('hidden');
+    progressEl.textContent = '0%';
+
+    // 疑似プログレスバー開始
+    let fakePercent = 0;
+    clearInterval(fakeProgressTimer);
+    fakeProgressTimer = setInterval(() => {
+      if (fakePercent < 90) {
+        fakePercent += 5;
+        progressEl.textContent = fakePercent + '%';
+      } else {
+        clearInterval(fakeProgressTimer);
+      }
+    }, 500);
+
+    // 実ファイル送信
     const formData = new FormData();
     formData.append('pdf_file', pdfFile);
     formData.append('excel_file', excelFile);
@@ -85,21 +106,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     xhr.upload.onprogress = e => {
       if (e.lengthComputable) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        progressText.textContent = percent + '%';
+        const realPercent = Math.round((e.loaded / e.total) * 100);
+        progressEl.textContent = realPercent + '%';
       }
     };
 
     xhr.onload = () => {
+      clearInterval(fakeProgressTimer);
+      progressEl.textContent = '100%';
       loading.classList.add('hidden');
+
       if (xhr.status === 200) {
-        // ダウンロード
+        // ダウンロード処理
         const blob = xhr.response;
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        // 固定ファイル名、またはヘッダーを解析してもOK
-        a.download = 'Combined_Result.xlsm';
         a.href = url;
+        a.download = 'Combined_Result.xlsm';
         a.click();
         window.URL.revokeObjectURL(url);
       } else {
@@ -108,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     xhr.onerror = () => {
+      clearInterval(fakeProgressTimer);
       loading.classList.add('hidden');
       alert('通信エラーが発生しました。');
     };
