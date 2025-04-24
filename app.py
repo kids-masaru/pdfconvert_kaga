@@ -2,6 +2,7 @@ import io
 import re
 import os
 import traceback
+import zipfile
 from typing import List, Dict, Any
 from flask import (
     Flask,
@@ -16,6 +17,7 @@ import pdfplumber
 from openpyxl import load_workbook
 from openpyxl.styles import Border, Side
 from openpyxl.utils import get_column_letter
+from win32com import client as win32client  # ExcelからPDF変換用
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -94,6 +96,35 @@ def remove_extra_empty_columns(rows: List[List[str]]) -> List[List[str]]:
     keep = [i for i in range(num_cols) if any(i < len(r) and r[i].strip() for r in rows)]
     return [[r[i] if i < len(r) else "" for i in keep] for r in rows]
 
+# --- ExcelからPDF変換関数 ---
+def excel_to_pdf(excel_data, sheet_name):
+    # 一時ファイルとして保存
+    temp_excel_path = "temp_output.xlsm"
+    with open(temp_excel_path, "wb") as f:
+        f.write(excel_data)
+    
+    # ExcelからPDF変換
+    excel = win32client.Dispatch("Excel.Application")
+    excel.Visible = False
+    try:
+        workbook = excel.Workbooks.Open(os.path.abspath(temp_excel_path))
+        sheet = workbook.Worksheets(sheet_name)
+        temp_pdf_path = "temp_output.pdf"
+        sheet.ExportAsFixedFormat(0, os.path.abspath(temp_pdf_path))
+        workbook.Close(False)
+        
+        # PDFデータを読み込み
+        with open(temp_pdf_path, "rb") as f:
+            pdf_data = f.read()
+        return pdf_data
+    finally:
+        excel.Quit()
+        # 一時ファイル削除
+        if os.path.exists(temp_excel_path):
+            os.remove(temp_excel_path)
+        if os.path.exists(temp_pdf_path):
+            os.remove(temp_pdf_path)
+
 # --- Excel書き込み関連 ---
 thin_border_side = Side(border_style="thin", color="000000")
 thin_border = Border(left=thin_border_side, right=thin_border_side,
@@ -166,13 +197,26 @@ def process_files():
     if not xlsx.filename.lower().endswith(('.xls', '.xlsx')):
         return jsonify({"error": "Excelファイル (.xls または .xlsx) をアップロードしてください。"}), 400
     try:
-        data = append_pdf_to_template(pdf.stream, xlsx.stream)
+        # Excelファイルを処理
+        excel_data = append_pdf_to_template(pdf.stream, xlsx.stream)
         base = os.path.splitext(xlsx.filename)[0]
-        name = f"Combined_{base}.xlsm"
+        excel_name = f"Combined_{base}.xlsm"
+        
+        # 「提出用」シートをPDFに変換
+        pdf_data = excel_to_pdf(excel_data, "提出用")
+        pdf_name = f"Combined_{base}_提出用.pdf"
+        
+        # ZIPファイルにまとめてダウンロード
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr(excel_name, excel_data)
+            zip_file.writestr(pdf_name, pdf_data)
+        
+        zip_buffer.seek(0)
         return send_file(
-            io.BytesIO(data),
-            mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
-            download_name=name,
+            zip_buffer,
+            mimetype='application/zip',
+            download_name=f"Combined_{base}.zip",
             as_attachment=True
         )
     except Exception as e:
