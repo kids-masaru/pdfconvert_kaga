@@ -136,4 +136,38 @@ body {
     color: #333;
     border: 1px solid #ccc;
   }
-  
+  /* ドロップエリア強調 */
+#drop-area.highlight {
+  border-color: #4a90e2;
+  background: #f0faff;
+}
+
+/* ローディングオーバーレイ */
+#loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+#loading-overlay.hidden {
+  display: none;
+}
+.spinner {
+  border: 4px solid #ddd;
+  border-top: 4px solid #4a90e2;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
