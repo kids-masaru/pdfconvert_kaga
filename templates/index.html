@@ -4,15 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDFとExcel結合ツール</title>
-  <!-- PWA マニフェスト -->
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-  <!-- ファビコン -->
   <link rel="icon" href="{{ favicon_url }}">
   <meta name="theme-color" content="#4a90e2">
-  <!-- 外部 CSS 読み込み -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="spinner"></div>
+    <p>処理中です。しばらくお待ちください…</p>
+  </div>
 
   <header class="header">
     <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="App Icon">
@@ -22,49 +24,24 @@
     </div>
   </header>
 
-  <div class="card upload-area">
+  <div class="card upload-area" id="drop-area">
     <div class="upload-icon">⇪</div>
     <h2>Upload your files</h2>
-    <p>Drag &amp; drop your PDF and Excel files here, or select them from your device</p>
-    <form method="POST" action="/process" enctype="multipart/form-data">
+    <p>Drag &amp; drop PDF and Excel files here, or select below</p>
+    <form id="upload-form" method="POST" action="/process" enctype="multipart/form-data">
       <div>
         <label class="btn btn-pdf">
-          <input type="file" name="pdf_file" accept=".pdf" style="display:none;" required>
           Select PDF
+          <input type="file" name="pdf_file" accept=".pdf" id="pdf-input" style="display:none;" required>
         </label>
         <label class="btn btn-excel">
-          <input type="file" name="excel_file" accept=".xls,.xlsx" style="display:none;" required>
           Select Excel
+          <input type="file" name="excel_file" accept=".xls,.xlsx" id="excel-input" style="display:none;" required>
         </label>
       </div>
-      <ul class="file-list">
-        {% if request.files and request.files.pdf_file %}
-        <li>
-          <div class="info">
-            <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="PDF icon">
-            <span class="name">{{ request.files.pdf_file.filename }}</span>
-          </div>
-          <button type="button" class="btn">✕</button>
-        </li>
-        {% endif %}
-        {% if request.files and request.files.excel_file %}
-        <li>
-          <div class="info">
-            <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Excel icon">
-            <span class="name">{{ request.files.excel_file.filename }}</span>
-          </div>
-          <button type="button" class="btn">✕</button>
-        </li>
-        {% endif %}
-      </ul>
+      <ul class="file-list" id="file-list"></ul>
       <button type="submit" class="btn-process">Process Files</button>
     </form>
-  </div>
-
-  <div class="footer-buttons">
-    <button class="btn">Show Upload</button>
-    <button class="btn">Show Processing</button>
-    <button class="btn">Show Results</button>
   </div>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
