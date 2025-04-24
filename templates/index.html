@@ -2,36 +2,15 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDFとExcel結合ツール</title>
   <!-- PWA マニフェスト -->
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <!-- ファビコン -->
   <link rel="icon" href="{{ favicon_url }}">
   <meta name="theme-color" content="#4a90e2">
-  <style>
-    body { font-family: sans-serif; background: #f2f2f2; margin: 0; padding: 20px; }
-    .header { display: flex; align-items: center; background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .header img { width: 48px; height: 48px; margin-right: 12px; }
-    .header .title { margin: 0; font-size: 1.25rem; }
-    .header .subtitle { margin: 4px 0 0; font-size: 0.875rem; color: #666; }
-    .card { background: #fff; padding: 20px; border: 2px dashed #ccc; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-    .card:hover { border-color: #4a90e2; }
-    .upload-icon { font-size: 2rem; color: #4a90e2; margin-bottom: 12px; }
-    .upload-area h2 { margin: 0; font-size: 1.125rem; }
-    .upload-area p { color: #666; font-size: 0.875rem; }
-    .btn { display: inline-block; margin: 10px 8px; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; }
-    .btn-pdf { background: #fdecea; color: #c0392b; }
-    .btn-excel { background: #e9f7ef; color: #27ae60; }
-    .file-list { list-style: none; padding: 0; margin: 20px 0; }
-    .file-list li { background: #fff; padding: 12px 16px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .file-list li .info { display: flex; align-items: center; }
-    .file-list li .info img { width: 24px; height: 24px; margin-right: 8px; }
-    .file-list li .info .name { font-size: 0.875rem; }
-    .btn-process { width: 100%; padding: 12px; background: #4a90e2; color: #fff; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; }
-    .footer-buttons { text-align: center; margin-top: 20px; }
-    .footer-buttons .btn { margin: 0 4px; background: #fff; color: #333; border: 1px solid #ccc; }
-  </style>
+  <!-- 外部 CSS 読み込み -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
@@ -58,7 +37,6 @@
           Select Excel
         </label>
       </div>
-      <!-- 選択済みファイル表示 (Flask側で値が渡されていれば表示) -->
       <ul class="file-list">
         {% if request.files and request.files.pdf_file %}
         <li>
