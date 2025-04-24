@@ -1,8 +1,10 @@
+// static/manifest.json
 {
   "name":        "PDF Converter Kaga",
   "short_name":  "PDFConv",
   "start_url":   "/",
-  "display":     "standalone",
+  // ★ standalone → browser に変更
+  "display":     "browser",
   "background_color": "#ffffff",
   "theme_color":      "#4a90e2",
   "icons": [
