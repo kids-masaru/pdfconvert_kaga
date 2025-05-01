@@ -10,6 +10,7 @@ from flask import (
     url_for
 )
 from openpyxl import load_workbook
+from openpyxl.styles import Border, Side
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -26,7 +27,7 @@ def allowed_file(filename: str) -> bool:
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def process_excel_template(upload_stream):
-    """Excelデータをテンプレートに転送する"""
+    """Excelデータをテンプレートに転送する（完全修正版）"""
     # テンプレートをマクロ有効で読み込み
     wb = load_workbook(TEMPLATE_FILE_PATH, keep_vba=True)
     
@@ -35,14 +36,30 @@ def process_excel_template(upload_stream):
     upload_ws = upload_wb.active
     template_ws = wb[wb.sheetnames[0]]
     
+    # 既存データのクリア
+    template_ws.delete_rows(1, template_ws.max_row)
+    
     # データ転送処理
-    for row in upload_ws.iter_rows(values_only=True):
-        template_ws.append(row)
+    for r_idx, row in enumerate(upload_ws.iter_rows(values_only=True), start=1):
+        for c_idx, value in enumerate(row, start=1):
+            template_ws.cell(row=r_idx, column=c_idx, value=value)
     
     # 列幅の転送
-    for col, dim in upload_ws.column_dimensions.items():
-        if dim.width:
-            template_ws.column_dimensions[col].width = dim.width
+    for col_letter, dim in upload_ws.column_dimensions.items():
+        template_col = template_ws.column_dimensions[col_letter]
+        template_col.width = dim.width
+        if dim.hidden:
+            template_col.hidden = True
+    
+    # スタイルの転送
+    for row in upload_ws.iter_rows():
+        for cell in row:
+            template_cell = template_ws.cell(row=cell.row, column=cell.column)
+            template_cell.font = cell.font.copy()
+            template_cell.border = cell.border.copy()
+            template_cell.fill = cell.fill.copy()
+            template_cell.number_format = cell.number_format
+            template_cell.alignment = cell.alignment.copy()
     
     # メモリに保存
     output = io.BytesIO()
@@ -50,7 +67,7 @@ def process_excel_template(upload_stream):
     output.seek(0)
     return output
 
-# --- ルート定義 ---
+# --- ルート定義（以下変更なし）---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -66,20 +83,17 @@ def favicon():
 @app.route('/process', methods=['POST'])
 def handle_processing():
     try:
-        # 単一ファイルアップロードに変更
         if 'excel_file' not in request.files:
             return render_template('error.html', message="Excelファイルを選択してください"), 400
             
         excel_file = request.files['excel_file']
         
-        # ファイル検証
         if excel_file.filename == '':
             return render_template('error.html', message="ファイルが選択されていません"), 400
             
         if not allowed_file(excel_file.filename):
             return render_template('error.html', message="Excelファイル(xls/xlsx)のみアップロード可能です"), 400
         
-        # ファイル処理
         processed_file = process_excel_template(excel_file.stream)
         
         return send_file(
