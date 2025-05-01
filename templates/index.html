@@ -9,10 +9,11 @@
 </head>
 <body>
     <div class="header">
-        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="ロゴ">
+        <!-- 正しい静的ファイルパスを使用 -->
+        <img src="{{ url_for('static', filename='images/icon.png') }}" alt="ロゴ">
         <div>
             <h1 class="title">Excel処理アプリ</h1>
-            <p class="subtitle">Excelファイルをアップロードしてください</p>
+            <p class="subtitle">ファイルをアップロードしてください</p>
         </div>
     </div>
 
