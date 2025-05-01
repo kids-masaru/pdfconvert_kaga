@@ -11,6 +11,7 @@ from flask import (
 )
 from openpyxl import load_workbook
 from openpyxl.styles import Border, Side
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -126,6 +127,10 @@ def handle_processing():
 @app.route('/service-worker.js')
 def service_worker():
     return send_from_directory(app.static_folder, 'service-worker.js')
+
+@app.route('/manifest.json')  # 追加
+def manifest():
+    return send_from_directory(app.static_folder, 'manifest.json')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
