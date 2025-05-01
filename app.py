@@ -3,7 +3,7 @@ import tempfile
 from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
-from openpyxl.writer.excel import save_vba
+from openpyxl.writer.excel import ExcelWriter
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
@@ -17,14 +17,17 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def convert_to_xlsm(input_path, output_path):
-    """xlsxをxlsmに変換（ダミーマクロ付加）"""
+    """xlsxをxlsmに変換（VBA対応版）"""
     wb = load_workbook(input_path)
     
-    # ダミーのVBAプロジェクト（実際にマクロが必要な場合は中身を実装）
-    vba_hex = '000000'  # 空のプロジェクト
+    # ダミーのVBAプロジェクト（実際の運用では有効なバイナリを指定）
+    vba_hex = b'000000'
+    
+    # ExcelWriterを使用してVBAを保存
+    writer = ExcelWriter(wb, None)
+    writer.save_vba(vba_hex)
     
     # マクロ有効ブックとして保存
-    save_vba(wb, vba_hex)
     wb.save(output_path)
     wb.close()
 
