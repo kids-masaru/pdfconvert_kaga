@@ -123,13 +123,21 @@ document.addEventListener('DOMContentLoaded', () => {
     xhr.send(formData);
   });
 });
+// PWA登録処理
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/static/service-worker.js')
       .then(registration => {
-        console.log('SW registered:', registration);
-      }).catch(err => {
-        console.log('SW registration failed:', err);
+        console.log('ServiceWorker登録成功:', registration.scope);
+      })
+      .catch(err => {
+        console.log('ServiceWorker登録失敗:', err);
       });
   });
 }
+
+// マニフェストリンクの動的追加
+const manifestLink = document.createElement('link');
+manifestLink.rel = 'manifest';
+manifestLink.href = '/static/manifest.json';
+document.head.appendChild(manifestLink);
