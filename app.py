@@ -94,12 +94,28 @@ def handle_processing():
         if not allowed_file(excel_file.filename):
             return render_template('error.html', message="Excelファイル(xls/xlsx)のみアップロード可能です"), 400
         
+        # ファイル名加工処理
+        original_name = os.path.splitext(excel_file.filename)[0]
+        
+        # 正規表現で「○○保育園」パターンを検索（例: 東京保育園 または 大阪保育園）
+        import re
+        pattern = r'([^_]+保育園)'  # アンダースコアを含まない「○○保育園」を抽出
+        match = re.search(pattern, original_name)
+        
+        if match:
+            school_name = match.group(1)
+            new_name = f"{school_name}_Processed.xlsm"
+        else:
+            new_name = "Processed.xlsm"
+        
+        safe_name = secure_filename(new_name)
+        
         processed_file = process_excel_template(excel_file.stream)
         
         return send_file(
             processed_file,
             mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
-            download_name='processed_result.xlsm',
+            download_name=safe_name,
             as_attachment=True
         )
         
