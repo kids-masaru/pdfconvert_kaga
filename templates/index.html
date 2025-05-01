@@ -1,32 +1,40 @@
-from flask import Flask, render_template, request, send_file
-from werkzeug.utils import secure_filename
-import os
-import tempfile
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel処理アプリ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="ロゴ">
+        <div>
+            <h1 class="title">Excel処理アプリ</h1>
+            <p class="subtitle">Excelファイルをアップロードしてください</p>
+        </div>
+    </div>
 
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
+    <div id="drop-area" class="card">
+        <div class="upload-area">
+            <div class="upload-icon">📁</div>
+            <h2>ファイルをドラッグ＆ドロップ</h2>
+            <p>または</p>
+            <input type="file" id="excel-input" accept=".xls,.xlsx" hidden>
+            <button type="button" class="btn btn-excel" onclick="document.getElementById('excel-input').click()">
+                Excelファイルを選択
+            </button>
+        </div>
+    </div>
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+    <ul id="file-list" class="file-list"></ul>
 
-@app.route('/process', methods=['POST'])
-def process_files():
-    excel_file = request.files.get('excel_file')
+    <button id="process-btn" class="btn-process">処理を開始</button>
 
-    if not excel_file:
-        return 'Excelファイルがアップロードされていません。', 400
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>処理中... <span id="progress">0%</span></p>
+    </div>
 
-    # アップロードされたファイルを保存
-    excel_filename = secure_filename(excel_file.filename)
-    excel_path = os.path.join(app.config['UPLOAD_FOLDER'], excel_filename)
-    excel_file.save(excel_path)
-
-    # 処理（今回はそのまま返す例）
-    # 実際にはここでExcelファイルを処理・変換する
-    result_path = excel_path  # 実際には処理後のファイルパスに変更
-
-    return send_file(result_path, as_attachment=True, download_name='Processed_Result.xlsm')
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
