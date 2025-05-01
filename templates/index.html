@@ -1,63 +1,32 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PDFとExcel結合ツール</title>
-  <!-- PWAマニフェスト -->
-  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-  <!-- ファビコン -->
-  <link rel="icon" href="{{ favicon_url }}">
-  <!-- CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-  <!-- ローディングオーバーレイ -->
-  <div id="loading-overlay" class="hidden">
-    <div class="spinner"></div>
-    <div id="loading-text">処理中です… (<span id="progress">0%</span>)</div>
-  </div>
+from flask import Flask, render_template, request, send_file
+from werkzeug.utils import secure_filename
+import os
+import tempfile
 
-  <div class="container">
-    <!-- ヘッダー -->
-    <header class="header">
-      <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="App Icon">
-      <div>
-        <h1 class="title">PDFとExcel結合ツール</h1>
-        <p class="subtitle">ファイルをアップロードしてデータを結合</p>
-      </div>
-    </header>
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
 
-    <!-- アップロードエリア -->
-    <div class="card upload-area" id="drop-area">
-      <div class="upload-icon">⇪</div>
-      <h2>ファイルをアップロード</h2>
-      <p>ここにドラッグ＆ドロップ、または下のボタンから選択してください</p>
-      <div>
-        <label for="pdf-input" class="btn btn-pdf">
-          Select PDF
-          <input type="file" id="pdf-input" accept=".pdf">
-        </label>
-        <label for="excel-input" class="btn btn-excel">
-          Select Excel
-          <input type="file" id="excel-input" accept=".xls,.xlsx">
-        </label>
-      </div>
-    </div>
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-    <!-- 選択ファイル一覧 -->
-    <ul class="file-list" id="file-list"></ul>
+@app.route('/process', methods=['POST'])
+def process_files():
+    excel_file = request.files.get('excel_file')
 
-    <!-- 処理開始ボタン -->
-    <button id="process-btn" class="btn-process">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:8px;">
-        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-      </svg>
-      Process Files
-    </button>
-  </div>
+    if not excel_file:
+        return 'Excelファイルがアップロードされていません。', 400
 
-  <!-- 外部JS読み込み -->
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+    # アップロードされたファイルを保存
+    excel_filename = secure_filename(excel_file.filename)
+    excel_path = os.path.join(app.config['UPLOAD_FOLDER'], excel_filename)
+    excel_file.save(excel_path)
+
+    # 処理（今回はそのまま返す例）
+    # 実際にはここでExcelファイルを処理・変換する
+    result_path = excel_path  # 実際には処理後のファイルパスに変更
+
+    return send_file(result_path, as_attachment=True, download_name='Processed_Result.xlsm')
+
+if __name__ == '__main__':
+    app.run(debug=True)
