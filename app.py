@@ -1,183 +1,171 @@
-import io
-import re
-import os
-import traceback
-from typing import List, Dict, Any
-from flask import (
-    Flask,
-    request,
-    render_template,
-    send_file,
-    send_from_directory,
-    jsonify,
-    url_for,
-)
-import pdfplumber
-from openpyxl import load_workbook
-from openpyxl.styles import Border, Side
-from openpyxl.utils import get_column_letter
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excelマージツール</title>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="icon" href="{{ favicon_url }}">
+  <meta name="theme-color" content="#4a90e2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <!-- ローディングオーバーレイ -->
+  <div id="loading-overlay" class="hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">処理中です。しばらくお待ちください… (<span id="progress">0%</span>)</p>
+  </div>
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+  <header class="header">
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="App Icon">
+    <div>
+      <h1 class="title">Excelマージツール</h1>
+      <p class="subtitle">Excelファイルをアップロードしてテンプレートと結合</p>
+    </div>
+  </header>
 
-# --- 定数 ---
-TEMPLATE_FILE_PATH = "template.xlsm"  # app.py と同じディレクトリにあると仮定
+  <div class="card upload-area" id="drop-area">
+    <div class="upload-icon">⇪</div>
+    <h2>Upload your Excel</h2>
+    <p>Excelファイルをここにドラッグ＆ドロップ、または以下で選択</p>
+    <div>
+      <label class="btn btn-excel">Excelを選択<input type="file" id="excel-input" accept=".xls,.xlsx,.xlsm" style="display:none;"></label>
+    </div>
+    <ul id="file-list" class="file-list"></ul>
+    <button id="process-btn" class="btn-process">処理開始</button>
+  </div>
 
-# --- PDF抽出関連の関数 ---
-def is_number(text: str) -> bool:
-    return bool(re.match(r'^\d+$', text.strip()))
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
 
-def get_line_groups(words: List[Dict[str, Any]], y_tolerance: float = 5) -> List[List[Dict[str, Any]]]:
-    if not words:
-        return []
-    sorted_words = sorted(words, key=lambda w: w['top'])
-    groups = []
-    current_group = [sorted_words[0]]
-    current_top = sorted_words[0]['top']
-    for word in sorted_words[1:]:
-        if abs(word['top'] - current_top) <= y_tolerance:
-            current_group.append(word)
-        else:
-            groups.append(current_group)
-            current_group = [word]
-            current_top = word['top']
-    groups.append(current_group)
-    return groups
+<!-- main.js -->
+// static/js/main.js
 
-def get_vertical_boundaries(page, tolerance: float = 2, min_gap: float = 20.0) -> List[float]:
-    vertical_lines = []
-    for line in page.lines:
-        if abs(line['x0'] - line['x1']) < tolerance:
-            vertical_lines.append((line['x0'] + line['x1']) / 2)
-    vertical_lines = [round(x, 1) for x in vertical_lines]
-    words = page.extract_words()
-    if not words:
-        return sorted(set(vertical_lines))
-    left_boundary = round(min(word['x0'] for word in words), 1)
-    right_boundary = round(max(word['x1'] for word in words), 1)
-    boundaries = sorted(set([left_boundary] + vertical_lines + [right_boundary]))
-    merged_boundaries = [boundaries[0]]
-    for b in boundaries[1:]:
-        if b - merged_boundaries[-1] >= min_gap:
-            merged_boundaries.append(b)
-    return merged_boundaries
-
-def split_line_using_boundaries(sorted_words: List[Dict[str, Any]], boundaries: List[float]) -> List[str]:
-    columns = []
-    for i in range(len(boundaries) - 1):
-        left = boundaries[i]
-        right = boundaries[i+1]
-        col_words = [word['text'] for word in sorted_words
-                     if (word['x0'] + word['x1'])/2 >= left and (word['x0'] + word['x1'])/2 < right]
-        columns.append(" ".join(col_words))
-    return columns
-
-def extract_text_with_layout(page) -> List[List[str]]:
-    words = page.extract_words(x_tolerance=5, y_tolerance=5)
-    if not words:
-        return []
-    boundaries = get_vertical_boundaries(page)
-    row_groups = get_line_groups(words, y_tolerance=5)
-    result_rows = []
-    for group in row_groups:
-        sorted_group = sorted(group, key=lambda w: w['x0'])
-        if boundaries:
-            cols = split_line_using_boundaries(sorted_group, boundaries)
-        else:
-            cols = [" ".join(w['text'] for w in sorted_group)]
-        result_rows.append(cols)
-    return result_rows
-
-def remove_extra_empty_columns(rows: List[List[str]]) -> List[List[str]]:
-    if not rows:
-        return rows
-    num_cols = max(len(r) for r in rows)
-    keep = [i for i in range(num_cols) if any(i < len(r) and r[i].strip() for r in rows)]
-    return [[r[i] if i < len(r) else "" for i in keep] for r in rows]
-
-# --- Excel書き込み関連 ---
-thin_border_side = Side(border_style="thin", color="000000")
-thin_border = Border(left=thin_border_side, right=thin_border_side,
-                     top=thin_border_side, bottom=thin_border_side)
-
-def append_pdf_to_template(pdf_stream, excel_stream):
-    wb = load_workbook(TEMPLATE_FILE_PATH, keep_vba=True)
-    if hasattr(wb, "calculation_properties"):
-        wb.calculation_properties.calcMode = 'auto'
-        wb.calculation_properties.fullCalcOnLoad = True
-
-    # アップロードExcelをテンプレートに反映
-    wb_up = load_workbook(excel_stream, data_only=True)
-    ws_up = wb_up.active
-    ws_tpl = wb[wb.sheetnames[0]]
-    for r_idx, row in enumerate(ws_up.iter_rows(values_only=True), start=1):
-        for c_idx, v in enumerate(row, start=1):
-            ws_tpl.cell(row=r_idx, column=c_idx, value=v)
-    for col, dim in ws_up.column_dimensions.items():
-        if dim.width:
-            ws_tpl.column_dimensions[col].width = dim.width
-
-    # PDF抽出 → 新規シートに書き込み
-    with pdfplumber.open(pdf_stream) as pdf:
-        for idx, page in enumerate(pdf.pages, start=1):
-            rows = extract_text_with_layout(page)
-            rows = [r for r in rows if any(c.strip() for c in r)]
-            rows = remove_extra_empty_columns(rows)
-            if not rows:
-                continue
-            name = f"Page_{idx}"
-            base = name; c=1
-            while name in wb.sheetnames:
-                name = f"{base}_{c}"; c+=1
-            ws = wb.create_sheet(title=name)
-            max_cols = max(len(r) for r in rows)
-            for r_i, row in enumerate(rows, start=1):
-                for c_i, val in enumerate(row, start=1):
-                    cell = ws.cell(row=r_i, column=c_i, value=val)
-                    cell.border = thin_border
-            for col_i in range(1, max_cols+1):
-                ws.column_dimensions[get_column_letter(col_i)].width = 12
-
-    out = io.BytesIO()
-    wb.save(out)
-    out.seek(0)
-    return out.read()
-
-# --- service-worker.js 配信ルート ---
-@app.route('/service-worker.js')
-def sw():
-    return send_from_directory(app.static_folder, 'service-worker.js')
-
-# --- ルート定義 ---
-@app.route('/')
-def index():
-    favicon_url = url_for('static', filename='icon.png')
-    return render_template('index.html', favicon_url=favicon_url)
-
-@app.route('/process', methods=['POST'])
-def process_files():
-    if 'pdf_file' not in request.files or 'excel_file' not in request.files:
-        return jsonify({"error": "PDFファイルとExcelファイルの両方が必要です。"}), 400
-    pdf = request.files['pdf_file']
-    xlsx = request.files['excel_file']
-    if pdf.filename == '' or xlsx.filename == '':
-        return jsonify({"error": "ファイルが選択されていません。"}), 400
-    if not pdf.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "PDFファイルをアップロードしてください。"}), 400
-    if not xlsx.filename.lower().endswith(('.xls', '.xlsx')):
-        return jsonify({"error": "Excelファイル (.xls または .xlsx) をアップロードしてください。"}), 400
-    try:
-        data = append_pdf_to_template(pdf.stream, xlsx.stream)
-        base = os.path.splitext(xlsx.filename)[0]
-        name = f"Combined_{base}.xlsm"
-        return send_file(
-            io.BytesIO(data),
-            mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
-            download_name=name,
-            as_attachment=True
-        )
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": f"ファイル処理中にエラーが発生しました: {e}"}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
+document.addEventListener('DOMContentLoaded', () => {
+    const dropArea   = document.getElementById('drop-area');
+    const excelInput = document.getElementById('excel-input');
+    const fileList   = document.getElementById('file-list');
+    const processBtn = document.getElementById('process-btn');
+    const loading    = document.getElementById('loading-overlay');
+    const progressEl = document.getElementById('progress');
+  
+    let excelFile = null;
+    let fakeProgressTimer;
+  
+    // ドラッグ＆ドロップ時のデフォルト挙動抑制
+    ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+      dropArea.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+    });
+    dropArea.addEventListener('dragover', () => dropArea.classList.add('highlight'));
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('highlight'));
+  
+    // drop された時
+    dropArea.addEventListener('drop', e => {
+      dropArea.classList.remove('highlight');
+      handleFiles(e.dataTransfer.files);
+    });
+  
+    // ファイル選択ボタンから
+    excelInput.addEventListener('change', () => {
+      excelFile = excelInput.files[0] || null;
+      updateFileList();
+    });
+  
+    // ファイル判定
+    function handleFiles(files) {
+      Array.from(files).forEach(f => {
+        const name = f.name.toLowerCase();
+        if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.xlsm')) {
+          excelFile = f;
+        }
+      });
+      updateFileList();
+    }
+  
+    // ファイル一覧描画
+    function updateFileList() {
+      fileList.innerHTML = '';
+      if (excelFile) {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="info">Excel: ${excelFile.name}</span>
+          <button type="button" class="btn-remove">✕</button>
+        `;
+        li.querySelector('.btn-remove').addEventListener('click', () => {
+          excelFile = null;
+          excelInput.value = '';
+          updateFileList();
+        });
+        fileList.appendChild(li);
+      }
+    }
+  
+    // 送信ボタン
+    processBtn.addEventListener('click', () => {
+      if (!excelFile) {
+        alert('Excelファイルをアップロードしてください。');
+        return;
+      }
+  
+      // ローディング表示＆プログレス初期化
+      loading.classList.remove('hidden');
+      progressEl.textContent = '0%';
+  
+      // 疑似プログレスバー開始
+      let fakePercent = 0;
+      clearInterval(fakeProgressTimer);
+      fakeProgressTimer = setInterval(() => {
+        if (fakePercent < 90) {
+          fakePercent += 5;
+          progressEl.textContent = fakePercent + '%';
+        } else {
+          clearInterval(fakeProgressTimer);
+        }
+      }, 500);
+  
+      // 実ファイル送信
+      const formData = new FormData();
+      formData.append('excel_file', excelFile);
+  
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/process');
+      xhr.responseType = 'blob';
+  
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const realPercent = Math.round((e.loaded / e.total) * 100);
+          progressEl.textContent = realPercent + '%';
+        }
+      };
+  
+      xhr.onload = () => {
+        clearInterval(fakeProgressTimer);
+        progressEl.textContent = '100%';
+        loading.classList.add('hidden');
+  
+        if (xhr.status === 200) {
+          const blob = xhr.response;
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          // ダウンロードファイル名を元ファイル名_Merged.xlsm に設定
+          const baseName = excelFile.name.replace(/\.(xlsx?|xlsm)$/, '');
+          a.download = `${baseName}_Merged.xlsm`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        } else {
+          alert('処理中にエラーが発生しました。');
+        }
+      };
+  
+      xhr.onerror = () => {
+        clearInterval(fakeProgressTimer);
+        loading.classList.add('hidden');
+        alert('通信エラーが発生しました。');
+      };
+  
+      xhr.send(formData);
+    });
+  });
