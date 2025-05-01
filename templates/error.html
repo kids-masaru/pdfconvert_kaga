@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>エラー発生</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">エラーが発生しました</h1>
+    </div>
+    <div class="card">
+        <p class="error-message">{{ message }}</p>
+        <a href="/" class="btn btn-process">トップに戻る</a>
+    </div>
+</body>
+</html>
