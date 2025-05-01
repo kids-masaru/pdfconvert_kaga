@@ -1,5 +1,3 @@
-Flask==2.2.5
-gunicorn==20.1.0
-openpyxl==3.0.10  # バージョンを下げる
+openpyxl==3.0.10  # マクロ処理が安定するバージョン
 pdfplumber==0.10.0
-reportlab==4.4.0
+Flask==2.2.5
