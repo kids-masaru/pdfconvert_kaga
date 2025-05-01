@@ -1,3 +1,4 @@
-openpyxl==3.0.10  # マクロ処理が安定するバージョン
-pdfplumber==0.10.0
 Flask==2.2.5
+openpyxl==3.0.10
+pdfplumber==0.10.0
+gunicorn==20.1.0
