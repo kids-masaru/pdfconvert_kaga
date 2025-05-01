@@ -13,7 +13,6 @@ def index():
 @app.route('/process', methods=['POST'])
 def process_files():
     excel_file = request.files.get('excel_file')
-
     if not excel_file:
         return 'Excelファイルがアップロードされていません。', 400
 
