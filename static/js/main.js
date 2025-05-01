@@ -1,15 +1,11 @@
-// static/js/main.js
-
 document.addEventListener('DOMContentLoaded', () => {
   const dropArea   = document.getElementById('drop-area');
-  const pdfInput   = document.getElementById('pdf-input');
   const excelInput = document.getElementById('excel-input');
   const fileList   = document.getElementById('file-list');
   const processBtn = document.getElementById('process-btn');
   const loading    = document.getElementById('loading-overlay');
   const progressEl = document.getElementById('progress');
 
-  let pdfFile   = null;
   let excelFile = null;
   let fakeProgressTimer;
 
@@ -27,10 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ファイル選択ボタンから
-  pdfInput.addEventListener('change', () => {
-    pdfFile = pdfInput.files[0] || null;
-    updateFileList();
-  });
   excelInput.addEventListener('change', () => {
     excelFile = excelInput.files[0] || null;
     updateFileList();
@@ -40,9 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleFiles(files) {
     Array.from(files).forEach(f => {
       const name = f.name.toLowerCase();
-      if (name.endsWith('.pdf')) {
-        pdfFile = f;
-      } else if (name.endsWith('.xls') || name.endsWith('.xlsx')) {
+      if (name.endsWith('.xls') || name.endsWith('.xlsx')) {
         excelFile = f;
       }
     });
@@ -52,30 +42,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // ファイル一覧描画
   function updateFileList() {
     fileList.innerHTML = '';
-    [['PDF', pdfFile], ['Excel', excelFile]].forEach(([label, file]) => {
-      if (file) {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <span class="info">${label}: ${file.name}</span>
-          <button type="button" class="btn-remove">✕</button>
-        `;
-        li.querySelector('.btn-remove').addEventListener('click', () => {
-          if (label === 'PDF') {
-            pdfFile = null; pdfInput.value = '';
-          } else {
-            excelFile = null; excelInput.value = '';
-          }
-          updateFileList();
-        });
-        fileList.appendChild(li);
-      }
-    });
+    if (excelFile) {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="info">Excel: ${excelFile.name}</span>
+        <button type="button" class="btn-remove">✕</button>
+      `;
+      li.querySelector('.btn-remove').addEventListener('click', () => {
+        excelFile = null;
+        excelInput.value = '';
+        updateFileList();
+      });
+      fileList.appendChild(li);
+    }
   }
 
   // 送信ボタン
   processBtn.addEventListener('click', () => {
-    if (!pdfFile || !excelFile) {
-      alert('PDFとExcelの両方をアップロードしてください。');
+    if (!excelFile) {
+      alert('Excelファイルをアップロードしてください。');
       return;
     }
 
@@ -97,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 実ファイル送信
     const formData = new FormData();
-    formData.append('pdf_file', pdfFile);
     formData.append('excel_file', excelFile);
 
     const xhr = new XMLHttpRequest();
@@ -122,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'Combined_Result.xlsm';
+        a.download = 'Processed_Result.xlsm';
         a.click();
         window.URL.revokeObjectURL(url);
       } else {
