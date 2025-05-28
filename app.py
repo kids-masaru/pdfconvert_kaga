@@ -13,11 +13,17 @@ from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
 import copy
 
-# PyPDF2はテキストベースのPDFからの抽出に利用
+# PDF処理用ライブラリ
 try:
-    from PyPDF2 import PdfReader # PyPDF2 3.0.0以降の推奨
+    import pdfplumber  # 表構造を保持したPDF処理に最適
+    PDFPLUMBER_AVAILABLE = True
 except ImportError:
-    from PyPDF2 import PdfFileReader # 以前のバージョン向け
+    PDFPLUMBER_AVAILABLE = False
+    # フォールバック用にPyPDF2も保持
+    try:
+        from PyPDF2 import PdfReader
+    except ImportError:
+        from PyPDF2 import PdfFileReader
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -33,7 +39,102 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def copy_worksheet_data(source_sheet, target_sheet, start_row=1, start_col=1):
+def extract_pdf_tables(pdf_bytes, filename):
+    """
+    PDFから表構造を保持してデータを抽出する関数
+    pdfplumberを使用して表の縦線・横線を認識し、セル構造を維持する
+    """
+    extracted_data = []
+    
+    if PDFPLUMBER_AVAILABLE:
+        try:
+            # pdfplumberを使用した高度な表抽出
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    page_data = {
+                        'page_number': page_num + 1,
+                        'tables': [],
+                        'text': ''
+                    }
+                    
+                    # ページから表を抽出
+                    tables = page.extract_tables()
+                    
+                    if tables:
+                        # 表が見つかった場合
+                        for table_idx, table in enumerate(tables):
+                            if table and len(table) > 0:
+                                # 空の行やセルを適切に処理
+                                clean_table = []
+                                for row in table:
+                                    if row:  # 行が空でない場合
+                                        clean_row = []
+                                        for cell in row:
+                                            # セルの内容を文字列として処理
+                                            if cell is not None:
+                                                # 改行や余分な空白を整理
+                                                cell_content = str(cell).strip().replace('\n', ' ')
+                                                clean_row.append(cell_content)
+                                            else:
+                                                clean_row.append('')  # 空のセル
+                                        clean_table.append(clean_row)
+                                
+                                if clean_table:  # 空でない表のみ保存
+                                    page_data['tables'].append({
+                                        'table_index': table_idx,
+                                        'data': clean_table
+                                    })
+                    
+                    # 表以外のテキストも抽出（補足情報として）
+                    page_text = page.extract_text()
+                    if page_text:
+                        # 改行を適切に処理
+                        clean_text = page_text.strip().replace('\r\n', '\n').replace('\r', '\n')
+                        page_data['text'] = clean_text
+                    
+                    extracted_data.append(page_data)
+            
+        except Exception as e:
+            print(f"pdfplumberでの処理中にエラーが発生: {e}")
+            # フォールバック処理
+            return extract_pdf_fallback(pdf_bytes, filename)
+    
+    else:
+        # pdfplumberが利用できない場合のフォールバック
+        return extract_pdf_fallback(pdf_bytes, filename)
+    
+    return extracted_data
+
+def extract_pdf_fallback(pdf_bytes, filename):
+    """
+    pdfplumberが利用できない場合のフォールバック処理
+    PyPDF2を使用した基本的なテキスト抽出
+    """
+    extracted_data = []
+    
+    try:
+        pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
+        for page_num in range(len(pdf_reader.pages)):
+            page = pdf_reader.pages[page_num]
+            text = page.extract_text()
+            
+            page_data = {
+                'page_number': page_num + 1,
+                'tables': [],
+                'text': text.strip() if text else f"[ページ {page_num + 1}: テキストを抽出できませんでした]"
+            }
+            extracted_data.append(page_data)
+    
+    except Exception as e:
+        print(f"PyPDF2での処理中にエラーが発生: {e}")
+        # 最後の手段として空のページデータを返す
+        extracted_data.append({
+            'page_number': 1,
+            'tables': [],
+            'text': f"[エラー: {filename} を処理できませんでした - {str(e)}]"
+        })
+    
+    return extracted_data
     """
     ソースシートからターゲットシートにデータをコピーする関数
     既存のデータがある場合は指定した位置から貼り付ける
@@ -123,84 +224,88 @@ def upload_and_process():
         
         copy_worksheet_data(uploaded_first_sheet, template_first_sheet, start_row, 1)
 
-        # 5. PDFファイルの処理
+        # 5. PDFファイルの処理（表構造を保持する高度な処理）
         for pdf_file_storage in pdf_files_storage:
             pdf_bytes = pdf_file_storage.read()
             
-            extracted_texts = []
-            try:
-                # テキストベースPDFとして抽出を試みる
-                pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
-                for page_num in range(len(pdf_reader.pages)):
-                    page = pdf_reader.pages[page_num]
-                    text = page.extract_text()
-                    
-                    # 文字化け対策：テキストが正常に抽出されているかチェック
-                    if text and text.strip(): 
-                        # 改行コードを統一し、不要な空白を削除
-                        cleaned_text = text.replace('\r\n', '\n').replace('\r', '\n')
-                        extracted_texts.append(cleaned_text)
-                    else:
-                        # テキストが抽出できなかった場合
-                        extracted_texts.append(f"[ページ {page_num + 1}: テキストを抽出できませんでした]") 
+            # 高度なPDF表抽出を実行
+            pdf_data = extract_pdf_tables(pdf_bytes, pdf_file_storage.filename)
+            
+            if not pdf_data:
+                return render_template('error.html', 
+                    message=f"PDF '{pdf_file_storage.filename}' から有効な内容を抽出できませんでした。"), 500
+
+            # 抽出したデータをテンプレートの新しいシートに配置
+            for page_data in pdf_data:
+                page_num = page_data['page_number']
                 
-            except Exception as e:
-                # PDFの読み込みやテキスト抽出に失敗した場合
-                print(f"PDF '{pdf_file_storage.filename}' のテキスト抽出エラー: {e}")
-                return render_template('error.html', message=f"PDF '{pdf_file_storage.filename}' の読み込みまたはテキスト抽出に失敗しました。詳細: {e}"), 500
-
-            if not extracted_texts:
-                return render_template('error.html', message=f"PDF '{pdf_file_storage.filename}' から有効な内容を抽出できませんでした。"), 500
-
-            # 抽出したテキストをテンプレートの新しいシートに貼り付ける
-            for i, page_content in enumerate(extracted_texts):
-                # シート名を生成（PDFファイル名 + ページ番号）
-                base_filename = os.path.splitext(secure_filename(pdf_file_storage.filename))[0]
-                sheet_name_base = base_filename[:20] if len(base_filename) > 20 else base_filename
+                # シート名を「Page_1」「Page_2」の形式で生成
+                sheet_name = f"Page_{page_num}"
                 
-                # シート名に使えない文字を安全な文字に変換
-                safe_sheet_name_base = (sheet_name_base
-                                      .replace('[', '').replace(']', '')
-                                      .replace('*', '').replace('?', '')
-                                      .replace(':', '').replace('/', '')
-                                      .replace('\\', ''))
-
-                # 最終的なシート名 (最大31文字制限)
-                sheet_name = f"{safe_sheet_name_base}_P{i+1}"
-                if len(sheet_name) > 31:
-                    suffix = f"_P{i+1}"
-                    sheet_name = sheet_name[:31 - len(suffix)] + suffix
-
                 # 同名のシートが既に存在する場合は番号を付ける
                 original_sheet_name = sheet_name
                 counter = 1
                 while sheet_name in [ws.title for ws in template_workbook.worksheets]:
-                    sheet_name = f"{original_sheet_name}_{counter}"
-                    if len(sheet_name) > 31:
-                        # 31文字を超える場合は調整
-                        base_part = original_sheet_name[:25]
-                        sheet_name = f"{base_part}_{counter}"
+                    sheet_name = f"Page_{page_num}_{counter}"
                     counter += 1
 
                 # 新しいシートを作成
                 new_sheet = template_workbook.create_sheet(title=sheet_name)
                 
-                # 抽出したテキストをExcelのセルに貼り付け
-                # 改行で分割してセルに配置
-                rows = page_content.split('\n')
-                for r_idx, row_text in enumerate(rows):
-                    if row_text.strip():  # 空行はスキップ
-                        # 長すぎるテキストは複数のセルに分割することも可能
-                        cell_text = row_text.strip()
-                        # Excelのセルの文字数制限（32,767文字）を考慮
-                        if len(cell_text) > 32767:
-                            cell_text = cell_text[:32767]
-                        
-                        new_sheet.cell(row=r_idx + 1, column=1, value=cell_text)
+                current_row = 1
                 
-                # ヘッダー情報を追加（オプション）
-                header_info = f"PDF: {pdf_file_storage.filename} - ページ {i+1}"
-                new_sheet.cell(row=1, column=2, value=header_info)
+                # ヘッダー情報を追加
+                header_info = f"PDF: {pdf_file_storage.filename} - ページ {page_num}"
+                new_sheet.cell(row=current_row, column=1, value=header_info)
+                current_row += 2  # 空行を1行開ける
+                
+                # 表データがある場合は表として配置
+                if page_data['tables']:
+                    for table_info in page_data['tables']:
+                        table_data = table_info['data']
+                        table_idx = table_info['table_index']
+                        
+                        # 表のタイトルを追加（複数の表がある場合）
+                        if len(page_data['tables']) > 1:
+                            table_title = f"表 {table_idx + 1}"
+                            new_sheet.cell(row=current_row, column=1, value=table_title)
+                            current_row += 1
+                        
+                        # 表のデータをExcelセルに配置
+                        for row_idx, row_data in enumerate(table_data):
+                            for col_idx, cell_data in enumerate(row_data):
+                                if cell_data:  # 空でないセルのみ配置
+                                    # セルの文字数制限を考慮
+                                    cell_text = str(cell_data)
+                                    if len(cell_text) > 32767:
+                                        cell_text = cell_text[:32767]
+                                    
+                                    new_sheet.cell(
+                                        row=current_row + row_idx, 
+                                        column=col_idx + 1, 
+                                        value=cell_text
+                                    )
+                        
+                        # 表の後に空行を追加
+                        current_row += len(table_data) + 2
+                
+                # 表以外のテキストがある場合は追加情報として配置
+                if page_data['text'] and page_data['text'].strip():
+                    # テキストセクションのヘッダー
+                    if page_data['tables']:  # 表もある場合
+                        new_sheet.cell(row=current_row, column=1, value="その他のテキスト:")
+                        current_row += 1
+                    
+                    # テキストを行ごとに分割して配置
+                    text_lines = page_data['text'].split('\n')
+                    for line in text_lines:
+                        if line.strip():  # 空行はスキップ
+                            # セルの文字数制限を考慮
+                            if len(line) > 32767:
+                                line = line[:32767]
+                            
+                            new_sheet.cell(row=current_row, column=1, value=line.strip())
+                            current_row += 1
 
         # 6. 処理済みファイルをメモリに保存
         output_excel_stream = io.BytesIO()
