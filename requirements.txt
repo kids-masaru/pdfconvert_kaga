@@ -3,6 +3,6 @@ openpyxl==3.0.10
 PyPDF2
 Pillow
 gunicorn==20.1.0
-+ pdfplumber==0.10.3  # PDF表構造解析のため必須
-+ pdfminer.six==20221105  # 日本語文字化け対策
-+ chardet==5.2.0  # エンコーディング検出
+pdfplumber==0.10.3  # PDF表構造解析のため必須
+pdfminer.six==20221105  # 日本語文字化け対策
+chardet==5.2.0  # エンコーディング検出
