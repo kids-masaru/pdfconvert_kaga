@@ -1,5 +1,3 @@
-// static/js/main.js
-
 document.addEventListener('DOMContentLoaded', () => {
     const dropAreaExcel = document.getElementById('drop-area-excel');
     const dropAreaPdf = document.getElementById('drop-area-pdf');
@@ -7,190 +5,195 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfInput = document.getElementById('pdf-input');
     const fileList = document.getElementById('file-list');
     const processBtn = document.getElementById('process-btn');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const progressBar = document.getElementById('progress'); // ProgressBarは今回使わないが変数として残す
+    // const loadingOverlay = document.getElementById('loading-overlay'); // 削除
+    // const progressText = document.getElementById('progress'); // 削除
 
-    let selectedExcelFile = null;
-    let selectedPdfFiles = [];
+    let excelFile = null;
+    let pdfFiles = [];
 
-    // --- ファイル選択/ドラッグ＆ドロップ処理 ---
-
-    function handleFiles(files, type) {
-        if (type === 'excel' && files.length > 0) {
-            selectedExcelFile = files[0];
+    // --- ファイル追加・削除共通関数 ---
+    function addFileToList(file, type) {
+        const li = document.createElement('li');
+        const infoDiv = document.createElement('div');
+        infoDiv.classList.add('info');
+        
+        let iconClass = '';
+        if (type === 'excel') {
+            iconClass = 'fas fa-file-excel';
         } else if (type === 'pdf') {
-            // 複数ファイルを扱うため、既存の配列に追加ではなく、選択されたもので置き換える
-            // ユーザーがファイルを再選択した場合、以前選択したPDFはクリアされる
-            selectedPdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            iconClass = 'fas fa-file-pdf';
         }
-        updateFileList();
+        
+        infoDiv.innerHTML = `<i class="${iconClass}"></i> <span class="name">${file.name}</span>`;
+        li.appendChild(infoDiv);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.classList.add('btn-remove');
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>'; // ✕アイコン
+        removeBtn.addEventListener('click', () => {
+            if (type === 'excel') {
+                excelFile = null;
+                dropAreaExcel.classList.remove('highlight');
+            } else if (type === 'pdf') {
+                pdfFiles = pdfFiles.filter(f => f !== file);
+                if (pdfFiles.length === 0) {
+                    dropAreaPdf.classList.remove('highlight');
+                }
+            }
+            li.remove();
+            updateProcessButtonState();
+        });
+        li.appendChild(removeBtn);
+        fileList.appendChild(li);
+        
+        updateProcessButtonState();
     }
 
     function updateFileList() {
         fileList.innerHTML = ''; // リストをクリア
-        if (selectedExcelFile) {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span class="info">📊 Excel: ${selectedExcelFile.name}</span>
-                <button type="button" class="btn-remove" data-type="excel">✕</button>
-            `;
-            fileList.appendChild(li);
+        if (excelFile) {
+            addFileToList(excelFile, 'excel');
         }
-        selectedPdfFiles.forEach(file => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span class="info">📄 PDF: ${file.name}</span>
-                <button type="button" class="btn-remove" data-type="pdf" data-name="${file.name}">✕</button>
-            `;
-            fileList.appendChild(li);
+        pdfFiles.forEach(file => addFileToList(file, 'pdf'));
+        updateProcessButtonState();
+    }
+
+    function updateProcessButtonState() {
+        if (excelFile && pdfFiles.length > 0) {
+            processBtn.disabled = false;
+        } else {
+            processBtn.disabled = true;
+        }
+    }
+
+    // --- ドラッグ＆ドロップ処理 ---
+    function setupDropArea(dropArea, fileInput, type) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
         });
 
-        // ファイル削除ボタンのイベントリスナー
-        fileList.querySelectorAll('.btn-remove').forEach(button => {
-            button.addEventListener('click', () => {
-                const type = button.dataset.type;
-                if (type === 'excel') {
-                    selectedExcelFile = null;
-                    excelInput.value = ''; // input要素のリセット
-                } else if (type === 'pdf') {
-                    const nameToRemove = button.dataset.name;
-                    // 配列から該当ファイルを削除
-                    selectedPdfFiles = selectedPdfFiles.filter(file => file.name !== nameToRemove);
-                    // PDFのinput要素は複数選択のため、個別のファイル削除でinputの状態を完全に同期するのは難しい。
-                    // ユーザーが再度PDFファイルを選択した場合、inputの状態が新しい選択で上書きされる。
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (type === 'excel') {
+                const newFile = files[0];
+                if (newFile && (newFile.name.endsWith('.xls') || newFile.name.endsWith('.xlsx'))) {
+                    excelFile = newFile;
+                    dropArea.classList.add('highlight');
+                } else {
+                    alert('Excelファイルのみをドロップしてください。');
                 }
-                updateFileList();
-            });
+            } else if (type === 'pdf') {
+                const newPdfs = Array.from(files).filter(file => file.name.endsWith('.pdf'));
+                if (newPdfs.length > 0) {
+                    pdfFiles = [...pdfFiles, ...newPdfs];
+                    dropArea.classList.add('highlight');
+                } else {
+                    alert('PDFファイルのみをドロップしてください。');
+                }
+            }
+            updateFileList();
+        }, false);
+
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (type === 'excel') {
+                if (files.length > 0) {
+                    excelFile = files[0];
+                    dropArea.classList.add('highlight');
+                }
+            } else if (type === 'pdf') {
+                if (files.length > 0) {
+                    pdfFiles = [...pdfFiles, ...Array.from(files)];
+                    dropArea.classList.add('highlight');
+                }
+            }
+            updateFileList();
         });
-
-        // 処理開始ボタンの有効/無効
-        processBtn.disabled = !(selectedExcelFile && selectedPdfFiles.length > 0);
-        processBtn.style.opacity = processBtn.disabled ? 0.5 : 1;
-        processBtn.style.cursor = processBtn.disabled ? 'not-allowed' : 'pointer';
     }
 
-    // ドラッグ＆ドロップ時のデフォルト挙動抑制
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
+    setupDropArea(dropAreaExcel, excelInput, 'excel');
+    setupDropArea(dropAreaPdf, pdfInput, 'pdf');
 
-    // ドロップエリアのハイライト処理
-    function highlightDropArea(element) {
-        element.classList.add('highlight');
-    }
-
-    function unhighlightDropArea(element) {
-        element.classList.remove('highlight');
-    }
-
-    // イベントリスナーの設定 (Excel用)
-    excelInput.addEventListener('change', (e) => handleFiles(e.target.files, 'excel'));
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropAreaExcel.addEventListener(eventName, () => highlightDropArea(dropAreaExcel), false);
-    });
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropAreaExcel.addEventListener(eventName, () => unhighlightDropArea(dropAreaExcel), false);
-    });
-    dropAreaExcel.addEventListener('drop', (e) => {
-        preventDefaults(e);
-        handleFiles(e.dataTransfer.files, 'excel');
-    }, false);
-    // ドラッグ＆ドロップのデフォルト挙動を常に抑制
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
-        dropAreaExcel.addEventListener(ev, preventDefaults, false);
-    });
-
-
-    // イベントリスナーの設定 (PDF用)
-    pdfInput.addEventListener('change', (e) => handleFiles(e.target.files, 'pdf'));
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropAreaPdf.addEventListener(eventName, () => highlightDropArea(dropAreaPdf), false);
-    });
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropAreaPdf.addEventListener(eventName, () => unhighlightDropArea(dropAreaPdf), false);
-    });
-    dropAreaPdf.addEventListener('drop', (e) => {
-        preventDefaults(e);
-        handleFiles(e.dataTransfer.files, 'pdf');
-    }, false);
-    // ドラッグ＆ドロップのデフォルト挙動を常に抑制
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
-        dropAreaPdf.addEventListener(ev, preventDefaults, false);
-    });
-
-
-    // --- 処理開始ボタンイベント ---
-
+    // --- 処理開始ボタン ---
     processBtn.addEventListener('click', async () => {
-        if (!selectedExcelFile || selectedPdfFiles.length === 0) {
-            alert('ExcelファイルとPDFファイルを両方選択してください。');
+        if (!excelFile || pdfFiles.length === 0) {
+            alert('ExcelファイルとPDFファイルの両方をアップロードしてください。');
             return;
         }
 
-        loadingOverlay.classList.remove('hidden');
-        progressBar.textContent = '処理中...'; // 進捗バーはシンプルに「処理中」表示
-
         const formData = new FormData();
-        formData.append('excel_file', selectedExcelFile);
-        selectedPdfFiles.forEach(file => {
-            formData.append('pdf_files', file); // バックエンドで複数ファイルとして受け取るための名前
+        formData.append('excel_file', excelFile);
+        pdfFiles.forEach(file => {
+            formData.append('pdf_files', file);
         });
 
+        // loadingOverlay.classList.remove('hidden'); // 削除
+        // progressText.textContent = '0%'; // 削除
+
         try {
-            const response = await fetch('/upload_and_process', { // Flaskのエンドポイント
+            const response = await fetch('/upload_and_process', {
                 method: 'POST',
                 body: formData,
             });
 
+            // loadingOverlay.classList.add('hidden'); // 削除
+
             if (response.ok) {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = 'processed_data.xlsx';
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) {
+                        filename = decodeURIComponent(matches[1].replace(/['"]/g, ''));
+                    }
+                }
+
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'processed_data.xlsx'; // ダウンロードファイル名
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a); // ダウンロード後、要素を削除
-                window.URL.revokeObjectURL(url); // URLを解放
+                a.remove();
+                window.URL.revokeObjectURL(url);
 
-                alert('処理が完了し、ファイルがダウンロードされました。');
-                // ファイル選択状態をリセット
-                selectedExcelFile = null;
-                selectedPdfFiles = [];
-                excelInput.value = '';
-                pdfInput.value = '';
+                // 成功したらファイルをクリア
+                excelFile = null;
+                pdfFiles = [];
                 updateFileList();
+                dropAreaExcel.classList.remove('highlight');
+                dropAreaPdf.classList.remove('highlight');
+                alert('処理が完了し、ファイルがダウンロードされました。');
+
             } else {
                 const errorText = await response.text();
-                alert(`エラーが発生しました: ${errorText}`);
-                console.error('Server error:', errorText);
+                // エラー表示のため、error.htmlにリダイレクト
+                window.location.href = `/error?message=${encodeURIComponent(errorText)}`;
             }
         } catch (error) {
-            console.error('Network or processing error:', error);
-            alert('ファイルのアップロードまたは処理中にネットワークエラーが発生しました。');
-        } finally {
-            loadingOverlay.classList.add('hidden'); // 処理終了後はローディング表示を非表示に
+            // loadingOverlay.classList.add('hidden'); // 削除
+            console.error('Fetch error:', error);
+            // エラー表示のため、error.htmlにリダイレクト
+            window.location.href = `/error?message=${encodeURIComponent('ファイルのアップロードまたは処理中にネットワークエラーが発生しました。')}`;
         }
     });
 
-    updateFileList(); // 初期状態を反映
+    updateFileList(); // 初期表示でボタンの状態を更新
 });
-
-// PWA関連 (既存のコードをそのまま利用)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/service-worker.js')
-            .then(registration => {
-                console.log('ServiceWorker登録成功:', registration.scope);
-            })
-            .catch(err => {
-                console.log('ServiceWorker登録失敗:', err);
-            });
-    });
-}
-
-const manifestLink = document.createElement('link');
-manifestLink.rel = 'manifest';
-manifestLink.href = '/static/mainifest.json'; // mainifest.jsonのパスを修正
-document.head.appendChild(manifestLink);
