@@ -135,6 +135,10 @@ def extract_pdf_fallback(pdf_bytes, filename):
         })
     
     return extracted_data
+
+# ここから copy_worksheet_data 関数を定義します。
+# 他の関数と同じく、トップレベル（インデントなし）で定義してください。
+def copy_worksheet_data(source_sheet, target_sheet, start_row, start_col):
     """
     ソースシートからターゲットシートにデータをコピーする関数
     既存のデータがある場合は指定した位置から貼り付ける
@@ -200,7 +204,6 @@ def upload_and_process():
         
         # テンプレートの1枚目にデータを貼り付け
         # 既存のデータがある場合は、適切な位置から貼り付ける
-        # ここでは既存データの下に貼り付けるか、上書きするかを決める必要があります
         # 要件に応じて調整してください
         
         # 既存データの最後の行を取得
@@ -222,6 +225,7 @@ def upload_and_process():
         else:
             start_row = last_row + 2  # 既存データがある場合は2行空けて貼り付け
         
+        # ここで copy_worksheet_data を呼び出します。
         copy_worksheet_data(uploaded_first_sheet, template_first_sheet, start_row, 1)
 
         # 5. PDFファイルの処理（表構造を保持する高度な処理）
@@ -333,3 +337,4 @@ def upload_and_process():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
