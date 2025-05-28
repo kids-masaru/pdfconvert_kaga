@@ -69,12 +69,12 @@ body {
     margin-bottom: 12px;
 }
 #drop-area-excel .upload-icon i {
-    font-size: 2em;
+    font-size: 1.5em;
     margin-bottom: 10px;
     color: #27ae60; /* Excelらしい緑色 */
 }
 #drop-area-pdf .upload-icon i {
-    font-size: 2em;
+    font-size: 1.5em;
     margin-bottom: 10px;
     color: #e74c3c; /* PDFらしい赤色 */
 }
