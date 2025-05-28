@@ -9,7 +9,6 @@
 </head>
 <body>
     <div class="header">
-        <!-- 正しい静的ファイルパスを使用 -->
         <img src="{{ url_for('static', filename='images/icon.png') }}" alt="ロゴ">
         <div>
             <h1 class="title">【保育室】【病児・一時】の勤務時間を自動で計算</h1>
@@ -17,14 +16,26 @@
         </div>
     </div>
 
-    <div id="drop-area" class="card">
+    <div id="drop-area-excel" class="card">
         <div class="upload-area">
-            <div class="upload-icon">📁</div>
-            <h2>ファイルをドラッグ＆ドロップ</h2>
+            <div class="upload-icon">📊</div>
+            <h2>シフト表 (Excel) をドラッグ＆ドロップ</h2>
             <p>または</p>
             <input type="file" id="excel-input" accept=".xls,.xlsx" hidden>
             <button type="button" class="btn btn-excel" onclick="document.getElementById('excel-input').click()">
                 Excelファイルを選択
+            </button>
+        </div>
+    </div>
+    
+    <div id="drop-area-pdf" class="card" style="margin-top: 20px;">
+        <div class="upload-area">
+            <div class="upload-icon">📄</div>
+            <h2>出勤簿 (PDF) をドラッグ＆ドロップ</h2>
+            <p>または</p>
+            <input type="file" id="pdf-input" accept=".pdf" multiple hidden>
+            <button type="button" class="btn btn-pdf" onclick="document.getElementById('pdf-input').click()">
+                PDFファイルを選択
             </button>
         </div>
     </div>
