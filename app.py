@@ -1,24 +1,30 @@
 import io
 import os
 import traceback
+from datetime import datetime
 from flask import (
     Flask,
     request,
     render_template,
     send_file,
-    send_from_directory,
     url_for
 )
 from openpyxl import load_workbook
-from openpyxl.styles import Border, Side
+# from openpyxl.styles import Border, Side # 今回の要件では直接使用しないためコメントアウト
 from werkzeug.utils import secure_filename
+
+# PyPDF2はテキストベースのPDFからの抽出に利用
+try:
+    from PyPDF2 import PdfReader # PyPDF2 3.0.0以降の推奨
+except ImportError:
+    from PyPDF2 import PdfFileReader # 以前のバージョン向け
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # --- 定数設定 ---
-TEMPLATE_FILE_PATH = "template.xlsm"
-ALLOWED_EXTENSIONS = {'xls', 'xlsx'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+# TEMPLATE_FILE_PATHは今回の要件では不要
+ALLOWED_EXTENSIONS = {'xls', 'xlsx', 'pdf'} # PDFも許可する
+MAX_CONTENT_LENGTH = 32 * 1024 * 1024  # 32MBに増量（PDFサイズ考慮）
 
 # --- 初期設定 ---
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
@@ -27,112 +33,105 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def process_excel_template(upload_stream):
-    """Excelデータをテンプレートに転送する（完全修正版）"""
-    # テンプレートをマクロ有効で読み込み
-    wb = load_workbook(TEMPLATE_FILE_PATH, keep_vba=True)
-    
-    # アップロードされたExcelを読み込み
-    upload_wb = load_workbook(upload_stream, data_only=True)
-    upload_ws = upload_wb.active
-    template_ws = wb[wb.sheetnames[0]]
-    
-    # 既存データのクリア
-    template_ws.delete_rows(1, template_ws.max_row)
-    
-    # データ転送処理
-    for r_idx, row in enumerate(upload_ws.iter_rows(values_only=True), start=1):
-        for c_idx, value in enumerate(row, start=1):
-            template_ws.cell(row=r_idx, column=c_idx, value=value)
-    
-    # 列幅の転送
-    for col_letter, dim in upload_ws.column_dimensions.items():
-        template_col = template_ws.column_dimensions[col_letter]
-        template_col.width = dim.width
-        if dim.hidden:
-            template_col.hidden = True
-    
-    # スタイルの転送
-    for row in upload_ws.iter_rows():
-        for cell in row:
-            template_cell = template_ws.cell(row=cell.row, column=cell.column)
-            template_cell.font = cell.font.copy()
-            template_cell.border = cell.border.copy()
-            template_cell.fill = cell.fill.copy()
-            template_cell.number_format = cell.number_format
-            template_cell.alignment = cell.alignment.copy()
-    
-    # メモリに保存
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return output
+# process_excel_template 関数は今回の要件では直接使用しないため削除またはコメントアウト
+# 現在のコードのその部分も削除してください。
 
-# --- ルート定義（以下変更なし）---
+# --- ルーティング ---
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(
-        os.path.join(app.static_folder, 'images'),
-        'icon.png',
-        mimetype='image/vnd.microsoft.icon'
-    )
-
-@app.route('/process', methods=['POST'])
-def handle_processing():
+@app.route('/upload_and_process', methods=['POST'])
+def upload_and_process():
     try:
-        if 'excel_file' not in request.files:
-            return render_template('error.html', message="Excelファイルを選択してください"), 400
+        # 1. ファイルの存在確認
+        if 'excel_file' not in request.files or 'pdf_files' not in request.files:
+            return render_template('error.html', message="ExcelファイルとPDFファイルの両方をアップロードしてください。"), 400
+
+        excel_file_storage = request.files['excel_file']
+        pdf_files_storage = request.files.getlist('pdf_files') # 複数PDFを受け取る
+
+        if not excel_file_storage.filename:
+            return render_template('error.html', message="Excelファイルが選択されていません。"), 400
+        if not all(f.filename for f in pdf_files_storage):
+            return render_template('error.html', message="PDFファイルが選択されていません。"), 400
+        
+        # 2. Excelファイルの読み込み（アップロードされたExcelをベースにする）
+        # アップロードされたExcelの最初のシートがシフト表データとして扱われる想定
+        excel_workbook = load_workbook(io.BytesIO(excel_file_storage.read()))
+
+        # 3. PDFファイルの処理
+        for pdf_file_storage in pdf_files_storage:
+            pdf_bytes = pdf_file_storage.read()
             
-        excel_file = request.files['excel_file']
-        
-        if excel_file.filename == '':
-            return render_template('error.html', message="ファイルが選択されていません"), 400
-            
-        if not allowed_file(excel_file.filename):
-            return render_template('error.html', message="Excelファイル(xls/xlsx)のみアップロード可能です"), 400
-        
-        # ファイル名加工処理
-        original_name = os.path.splitext(excel_file.filename)[0]
-        
-        # 正規表現で「○○保育園」パターンを検索（例: 東京保育園 または 大阪保育園）
-        import re
-        pattern = r'([^_]+保育園)'  # アンダースコアを含まない「○○保育園」を抽出
-        match = re.search(pattern, original_name)
-        
-        if match:
-            school_name = match.group(1)
-            new_name = f"{school_name}_Processed.xlsm"
-        else:
-            new_name = "Processed.xlsm"
-        
-        safe_name = secure_filename(new_name)
-        
-        processed_file = process_excel_template(excel_file.stream)
-        
+            extracted_texts = []
+            try:
+                # テキストベースPDFとして抽出を試みる (OCRは不要)
+                pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
+                for page_num in range(len(pdf_reader.pages)):
+                    page = pdf_reader.pages[page_num]
+                    text = page.extract_text()
+                    if text and text.strip(): # テキストが空でなければ追加
+                        extracted_texts.append(text)
+                    else:
+                        # テキストが抽出できなかった場合（例: 空白ページ）、空のテキストとして追加
+                        extracted_texts.append("") 
+                
+            except Exception as e:
+                # PDFの読み込みやテキスト抽出に失敗した場合
+                print(f"PDF '{pdf_file_storage.filename}' のテキスト抽出エラー: {e}")
+                return render_template('error.html', message=f"PDF '{pdf_file_storage.filename}' の読み込みまたはテキスト抽出に失敗しました。詳細: {e}"), 500
+
+            if not extracted_texts:
+                return render_template('error.html', message=f"PDF '{pdf_file_storage.filename}' から有効な内容を抽出できませんでした。"), 500
+
+            # 抽出したテキストをExcelの新しいシートに貼り付ける
+            for i, page_content in enumerate(extracted_texts):
+                # シート名を Page_1, Page_2 の形式で生成
+                # ユニーク性を保つために、PDFファイル名の一部を含める
+                base_filename = os.path.splitext(secure_filename(pdf_file_storage.filename))[0]
+                sheet_name_base = base_filename[:20] if len(base_filename) > 20 else base_filename
+                
+                # シート名には使えない文字があるので、安全な名前に変換
+                # Excelのシート名に使えない文字: \ / ? * [ ] :
+                safe_sheet_name_base = sheet_name_base.replace('[', '').replace(']', '').replace('*', '').replace('?', '').replace(':', '').replace('/', '').replace('\\', '')
+
+                # 最終的なシート名 (最大31文字)
+                sheet_name = f"{safe_sheet_name_base}_Page_{i+1}"
+                if len(sheet_name) > 31:
+                    # 長すぎる場合は末尾を切り詰める (Page_X の部分は残すように調整)
+                    suffix = f"_Page_{i+1}"
+                    sheet_name = sheet_name[:31 - len(suffix)] + suffix
+
+
+                new_sheet = excel_workbook.create_sheet(title=sheet_name)
+                
+                # 抽出したテキストをExcelのセルに貼り付け
+                rows = page_content.split('\n')
+                for r_idx, row_text in enumerate(rows):
+                    if row_text.strip(): # 空行はスキップ
+                        new_sheet.cell(row=r_idx + 1, column=1, value=row_text.strip())
+
+        # 4. 処理済みExcelファイルをメモリに保存
+        output_excel_stream = io.BytesIO()
+        excel_workbook.save(output_excel_stream)
+        output_excel_stream.seek(0) # ストリームの先頭に戻す
+
+        # 5. 処理済みExcelファイルをダウンロード用に返す
         return send_file(
-            processed_file,
-            mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
-            download_name=safe_name,
-            as_attachment=True
+            output_excel_stream,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'processed_data_{datetime.now().strftime("%Y%m%d%H%M%S")}.xlsx'
         )
-        
+
     except Exception as e:
-        app.logger.error(f"処理エラー: {traceback.format_exc()}")
-        return render_template('error.html', message=f"処理エラー: {str(e)}"), 500
+        # エラーログ出力
+        print(f"An error occurred: {e}")
+        traceback.print_exc() # 詳細なトレースバックを出力
 
-@app.route('/service-worker.js')
-def service_worker():
-    return send_from_directory(app.static_folder, 'service-worker.js')
-
-@app.route('/manifest.json')  # 追加
-def manifest():
-    return send_from_directory(app.static_folder, 'manifest.json')
+        return render_template('error.html', message=f"ファイル処理中に予期せぬエラーが発生しました: {e}"), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    host = os.environ.get('HOST', '0.0.0.0')
-    app.run(host=host, port=port)
+    app.run(debug=True)
