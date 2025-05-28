@@ -19,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'excel' && files.length > 0) {
             selectedExcelFile = files[0];
         } else if (type === 'pdf') {
-            // 複数ファイルを扱うため、既存の配列に追加ではなく、置き換える
+            // 複数ファイルを扱うため、既存の配列に追加ではなく、選択されたもので置き換える
+            // ユーザーがファイルを再選択した場合、以前選択したPDFはクリアされる
             selectedPdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
         }
         updateFileList();
@@ -53,11 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     excelInput.value = ''; // input要素のリセット
                 } else if (type === 'pdf') {
                     const nameToRemove = button.dataset.name;
+                    // 配列から該当ファイルを削除
                     selectedPdfFiles = selectedPdfFiles.filter(file => file.name !== nameToRemove);
-                    // PDF inputは複数ファイル選択なので、個別にリセットは難しい。
-                    // 必要であれば、個別のファイル選択ボタンを設けるか、複雑なロジックが必要。
-                    // 今回は個別のファイル削除はリストから削除するのみとし、inputはそのまま。
-                    // もし再度選択し直すなら、ユーザーはinputをもう一度クリックすることになる。
+                    // PDFのinput要素は複数選択のため、個別のファイル削除でinputの状態を完全に同期するのは難しい。
+                    // ユーザーが再度PDFファイルを選択した場合、inputの状態が新しい選択で上書きされる。
                 }
                 updateFileList();
             });
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         element.classList.remove('highlight');
     }
 
-    // イベントリスナーの設定 (Excel)
+    // イベントリスナーの設定 (Excel用)
     excelInput.addEventListener('change', (e) => handleFiles(e.target.files, 'excel'));
     ['dragenter', 'dragover'].forEach(eventName => {
         dropAreaExcel.addEventListener(eventName, () => highlightDropArea(dropAreaExcel), false);
@@ -96,12 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
         preventDefaults(e);
         handleFiles(e.dataTransfer.files, 'excel');
     }, false);
+    // ドラッグ＆ドロップのデフォルト挙動を常に抑制
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
         dropAreaExcel.addEventListener(ev, preventDefaults, false);
     });
 
 
-    // イベントリスナーの設定 (PDF)
+    // イベントリスナーの設定 (PDF用)
     pdfInput.addEventListener('change', (e) => handleFiles(e.target.files, 'pdf'));
     ['dragenter', 'dragover'].forEach(eventName => {
         dropAreaPdf.addEventListener(eventName, () => highlightDropArea(dropAreaPdf), false);
@@ -113,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         preventDefaults(e);
         handleFiles(e.dataTransfer.files, 'pdf');
     }, false);
+    // ドラッグ＆ドロップのデフォルト挙動を常に抑制
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
         dropAreaPdf.addEventListener(ev, preventDefaults, false);
     });
@@ -175,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFileList(); // 初期状態を反映
 });
 
-// PWA関連 (現状維持でOK)
+// PWA関連 (既存のコードをそのまま利用)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/service-worker.js')
@@ -190,5 +192,5 @@ if ('serviceWorker' in navigator) {
 
 const manifestLink = document.createElement('link');
 manifestLink.rel = 'manifest';
-manifestLink.href = '/static/manifest.json';
+manifestLink.href = '/static/mainifest.json'; // mainifest.jsonのパスを修正
 document.head.appendChild(manifestLink);
