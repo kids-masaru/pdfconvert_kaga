@@ -12,6 +12,7 @@ from flask import (
 from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
 import copy
+import re # 正規表現のためにreモジュールをインポート
 
 # PDF処理用ライブラリ
 try:
@@ -136,8 +137,6 @@ def extract_pdf_fallback(pdf_bytes, filename):
     
     return extracted_data
 
-# ここから copy_worksheet_data 関数を定義します。
-# 他の関数と同じく、トップレベル（インデントなし）で定義してください。
 def copy_worksheet_data(source_sheet, target_sheet, start_row, start_col):
     """
     ソースシートからターゲットシートにデータをコピーする関数
@@ -202,10 +201,6 @@ def upload_and_process():
         
         template_first_sheet = template_workbook.worksheets[0]
         
-        # テンプレートの1枚目にデータを貼り付け
-        # 既存のデータがある場合は、適切な位置から貼り付ける
-        # 要件に応じて調整してください
-        
         # 既存データの最後の行を取得
         last_row = template_first_sheet.max_row if template_first_sheet.max_row > 1 else 1
         
@@ -225,7 +220,6 @@ def upload_and_process():
         else:
             start_row = last_row + 2  # 既存データがある場合は2行空けて貼り付け
         
-        # ここで copy_worksheet_data を呼び出します。
         copy_worksheet_data(uploaded_first_sheet, template_first_sheet, start_row, 1)
 
         # 5. PDFファイルの処理（表構造を保持する高度な処理）
@@ -247,7 +241,6 @@ def upload_and_process():
                 sheet_name = f"Page_{page_num}"
                 
                 # 同名のシートが既に存在する場合は番号を付ける
-                original_sheet_name = sheet_name
                 counter = 1
                 while sheet_name in [ws.title for ws in template_workbook.worksheets]:
                     sheet_name = f"Page_{page_num}_{counter}"
@@ -256,15 +249,92 @@ def upload_and_process():
                 # 新しいシートを作成
                 new_sheet = template_workbook.create_sheet(title=sheet_name)
                 
-                current_row = 1
+                # --- PDFテキストから特定情報を抽出 ---
+                extracted_title = ""
+                extracted_name = ""
+                extracted_role = ""
+                remaining_text_lines = []
                 
-                # ヘッダー情報を追加
-                header_info = f"PDF: {pdf_file_storage.filename} - ページ {page_num}"
-                new_sheet.cell(row=current_row, column=1, value=header_info)
-                current_row += 2  # 空行を1行開ける
+                if page_data['text']:
+                    lines = page_data['text'].split('\n')
+                    consumed_lines_indices = set() # 抽出に使用した行のインデックスを記録
+
+                    # タイトル（例: "YYYY年M月出勤簿"）を検索
+                    for i, line in enumerate(lines):
+                        match_title = re.search(r'(\d{4}年\d{1,2}月出勤簿)', line)
+                        if match_title:
+                            extracted_title = match_title.group(1).strip()
+                            consumed_lines_indices.add(i)
+                            break
+
+                    # 名前（氏名）と役割（雇用形態）を検索
+                    # 氏名が見つかった行、またはその周辺から情報を取得
+                    for i, line in enumerate(lines):
+                        if i in consumed_lines_indices: continue
+
+                        if "氏名" in line:
+                            if "氏名：" in line:
+                                extracted_name = line.split("氏名：", 1)[1].strip()
+                                consumed_lines_indices.add(i)
+                            else:
+                                # "氏名"のみの場合、その後のテキストや次の行を試す
+                                parts = line.split("氏名", 1)
+                                if len(parts) > 1 and parts[1].strip():
+                                    extracted_name = parts[1].strip().split(' ')[0]
+                                    consumed_lines_indices.add(i)
+                                elif i + 1 < len(lines):
+                                    next_line = lines[i+1].strip()
+                                    # 次の行が名前である可能性をチェック（他のキーワードを含まない場合）
+                                    if next_line and not re.search(r'^\d{4}年\d{1,2}月', next_line) and \
+                                       not any(kw in next_line for kw in ["正社員", "パート", "園長", "出勤簿", "表"]):
+                                        extracted_name = next_line.split(' ')[0]
+                                        consumed_lines_indices.add(i+1)
+                                        consumed_lines_indices.add(i)
+                            
+                            # 名前が見つかった後、同じ行または周辺で役割を検索
+                            if "正社員" in line: extracted_role = "正社員"
+                            elif "パート" in line: extracted_role = "パート"
+                            elif "園長" in line: extracted_role = "園長"
+                            
+                            # 役割がまだ見つからない場合、次の数行をチェック
+                            if not extracted_role:
+                                for j in range(i, min(i+3, len(lines))): # 現在の行と次の2行をチェック
+                                    if j in consumed_lines_indices: continue
+                                    if "正社員" in lines[j]:
+                                        extracted_role = "正社員"
+                                        consumed_lines_indices.add(j)
+                                        break
+                                    elif "パート" in lines[j]:
+                                        extracted_role = "パート"
+                                        consumed_lines_indices.add(j)
+                                        break
+                                    elif "園長" in lines[j]:
+                                        extracted_role = "園長"
+                                        consumed_lines_indices.add(j)
+                                        break
+                            break # 氏名が見つかったので、名前と役割の検索ループを抜ける
+
+                    # 抽出に使われなかった残りのテキスト行を収集
+                    for i, line in enumerate(lines):
+                        if i not in consumed_lines_indices and line.strip():
+                            remaining_text_lines.append(line.strip())
+
+                # page_data['text']を、抽出されなかった残りのテキストのみで更新
+                page_data['text'] = '\n'.join(remaining_text_lines) if remaining_text_lines else ''
+
+                # --- 抽出した情報をExcelシートの特定セルに配置 ---
+                new_sheet.cell(row=1, column=1, value=extracted_title) # A1セルにタイトル
+                new_sheet.cell(row=2, column=1, value=extracted_name)  # A2セルに名前
+                new_sheet.cell(row=2, column=3, value=extracted_role)  # C2セルに役割
+
+                # 以降のコンテンツ（表や残りのテキスト）の開始行を調整
+                # A1, A2, C2のために2行使用したので、3行目以降から開始
+                current_row = 4 # 3行目まで使用済みの場合は4行目から開始
                 
                 # 表データがある場合は表として配置
                 if page_data['tables']:
+                    # 表の前に少しスペースを開ける
+                    current_row += 1 
                     for table_info in page_data['tables']:
                         table_data = table_info['data']
                         table_idx = table_info['table_index']
@@ -294,9 +364,10 @@ def upload_and_process():
                         current_row += len(table_data) + 2
                 
                 # 表以外のテキストがある場合は追加情報として配置
+                # 抽出済みのテキストはここには含まれないように調整済み
                 if page_data['text'] and page_data['text'].strip():
-                    # テキストセクションのヘッダー
-                    if page_data['tables']:  # 表もある場合
+                    # テキストセクションのヘッダー（表がある場合は追加）
+                    if page_data['tables']:
                         new_sheet.cell(row=current_row, column=1, value="その他のテキスト:")
                         current_row += 1
                     
