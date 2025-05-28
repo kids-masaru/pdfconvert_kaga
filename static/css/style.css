@@ -154,3 +154,241 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* 例: 既存のスタイルに追記する形で */
+
+/* ボタンのスタイル (もし存在しない場合) */
+.btn {
+    /* 既存のボタンの共通スタイルがあればここに */
+}
+
+.btn-excel {
+    background-color: #27ae60; /* Excelらしい緑系の色 */
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
+
+.btn-excel:hover {
+    background-color: #229954;
+}
+
+.btn-pdf {
+    background-color: #e74c3c; /* PDFらしい赤系の色 */
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
+
+.btn-pdf:hover {
+    background-color: #c0392b;
+}
+
+/* アイコンのスタイル */
+#drop-area-excel .upload-icon i,
+#drop-area-pdf .upload-icon i {
+    font-size: 4em; /* アイコンのサイズ */
+    margin-bottom: 10px;
+    color: #3498db; /* アイコンの色 (例: 青) */
+    /* 必要に応じて他のスタイルを追加 */
+}
+
+/* ドロップエリアの共通スタイル (既存のものを維持または調整) */
+.card {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    margin-bottom: 20px;
+    border: 2px dashed #ccc;
+    transition: border-color 0.3s ease;
+}
+
+.card.highlight {
+    border-color: #3498db;
+}
+
+.upload-area {
+    padding: 20px;
+}
+
+.upload-icon {
+    font-size: 4em;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+/* ファイルリストのスタイル */
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 20px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    max-height: 200px; /* スクロール可能にする場合 */
+    overflow-y: auto;
+}
+
+.file-list li {
+    background-color: #f9f9f9;
+    padding: 10px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.file-list li:last-child {
+    border-bottom: none;
+}
+
+.file-list .info {
+    flex-grow: 1;
+    text-align: left;
+    font-size: 0.9em;
+}
+
+.btn-remove {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 1.2em;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.btn-remove:hover {
+    color: #c0392b;
+}
+
+/* 処理開始ボタン */
+.btn-process {
+    background-color: #3498db;
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-top: 20px;
+    transition: background-color 0.3s ease;
+    width: 100%; /* 幅を広げる場合 */
+    box-sizing: border-box; /* paddingを含めて幅を計算 */
+}
+
+.btn-process:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+
+.btn-process:disabled {
+    background-color: #a0a0a0;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* ローディングオーバーレイ */
+.hidden {
+    display: none;
+}
+
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 1.2em;
+    z-index: 1000;
+}
+
+.spinner {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #3498db;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* エラーメッセージ */
+.error-message {
+    color: #e74c3c;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+/* ヘッダー */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: center; /* 中央寄せ */
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #eee;
+}
+
+.header img {
+    height: 60px; /* ロゴの高さ */
+    margin-right: 15px;
+}
+
+.header .title {
+    font-size: 1.8em;
+    color: #333;
+    margin: 0;
+}
+
+.header .subtitle {
+    font-size: 1em;
+    color: #666;
+    margin: 5px 0 0;
+}
+
+/* その他の基本的なレイアウトやフォント設定など */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f7f6;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* 中央寄せ */
+    min-height: 100vh;
+}
+
+/* エラーページのスタイル */
+body.error-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f4f7f6;
+}
+
+.error-page .card {
+    max-width: 500px;
+    padding: 30px;
+}
