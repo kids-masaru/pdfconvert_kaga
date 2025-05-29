@@ -140,13 +140,13 @@
 
                 if (!isMultiple) { // Excel (単一)
                     selectedExcelFile = file;
-                    console.log('Selected Excel File:', selectedExcelFile); // デバッグ用
+                    console.log('Selected Excel File:', selectedExcelFile.name, selectedExcelFile.size); // デバッグ用
                     displayFile(file, fileListElement, 'excel');
                 } else { // PDF (複数)
                     // 既にリストにあるかチェック (ファイル名とサイズでユニーク性を判断)
                     if (!selectedPdfFiles.some(f => f.name === file.name && f.size === file.size)) {
                         selectedPdfFiles.push(file);
-                        console.log('Selected PDF Files:', selectedPdfFiles); // デバッグ用
+                        console.log('Selected PDF Files:', selectedPdfFiles.map(f => f.name)); // デバッグ用
                         displayFile(file, fileListElement, 'pdf');
                     }
                 }
@@ -166,7 +166,7 @@
         // --- ボタンの有効/無効状態を更新 ---
         function updateSubmitButtonState() {
             console.log('Updating submit button state...'); // デバッグ用
-            console.log('selectedExcelFile:', selectedExcelFile); // デバッグ用
+            console.log('selectedExcelFile:', selectedExcelFile ? selectedExcelFile.name : 'None'); // デバッグ用
             console.log('selectedPdfFiles.length:', selectedPdfFiles.length); // デバッグ用
 
             if (selectedExcelFile && selectedPdfFiles.length > 0) {
@@ -187,6 +187,7 @@
 
         // --- フォーム送信 (AJAX) ---
         uploadForm.addEventListener('submit', async function(event) {
+            console.log('Form submit event triggered.'); // デバッグ用
             event.preventDefault(); // デフォルトのフォーム送信をキャンセル
 
             // ローディングオーバーレイを表示
@@ -198,18 +199,28 @@
             const formData = new FormData();
             if (selectedExcelFile) {
                 formData.append('excel_file', selectedExcelFile);
+                console.log('Appending Excel file to FormData:', selectedExcelFile.name); // デバッグ用
+            } else {
+                console.warn('No Excel file selected.'); // デバッグ用
             }
-            selectedPdfFiles.forEach(file => {
+            selectedPdfFiles.forEach((file, index) => {
                 formData.append('pdf_files', file);
+                console.log(`Appending PDF file ${index + 1} to FormData:`, file.name); // デバッグ用
             });
+            if (selectedPdfFiles.length === 0) {
+                console.warn('No PDF files selected.'); // デバッグ用
+            }
 
             try {
+                console.log('Initiating fetch request to /upload_and_process...'); // デバッグ用
                 const response = await fetch('/upload_and_process', {
                     method: 'POST',
                     body: formData
                 });
+                console.log('Fetch request completed. Response status:', response.status); // デバッグ用
 
                 if (response.ok) {
+                    console.log('Response OK. Processing download...'); // デバッグ用
                     // ファイル名を取得 (Content-Dispositionヘッダーから)
                     const contentDisposition = response.headers.get('Content-Disposition');
                     let filename = 'processed_template.xlsm'; // デフォルトのファイル名
@@ -217,6 +228,7 @@
                         const filenameMatch = /filename\*?=['"]?(?:UTF-8'')?([^;"]+)/.exec(contentDisposition);
                         if (filenameMatch && filenameMatch[1]) {
                             filename = decodeURIComponent(filenameMatch[1]);
+                            console.log('Extracted filename from Content-Disposition:', filename); // デバッグ用
                         }
                     }
 
@@ -232,58 +244,8 @@
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url); // オブジェクトURLを解放
+                    console.log('File download triggered.'); // デバッグ用
 
                     // ローディングオーバーレイを非表示にし、ボタンをリセット
                     loadingOverlay.style.display = 'none';
-                    submitButton.disabled = false;
-                    submitButton.textContent = '処理を開始する';
-                    
-                    // ファイルリストもクリア
-                    selectedExcelFile = null;
-                    selectedPdfFiles = [];
-                    excelFileList.innerHTML = '';
-                    pdfFileList.innerHTML = '';
-                    updateSubmitButtonState();
-
-                } else {
-                    // エラーレスポンスの場合
-                    const errorText = await response.text(); // エラーテキストをそのまま取得
-                    // エラーページにリダイレクトするか、アラートで表示
-                    // 今回はアラートで表示し、より詳細なエラーはコンソールに出力
-                    alert('ファイル処理中にエラーが発生しました。\n詳細はコンソールを確認してください。');
-                    console.error('Server error:', response.status, errorText);
-                    
-                    // ローディングオーバーレイを非表示にし、ボタンをリセット
-                    loadingOverlay.style.display = 'none';
-                    submitButton.disabled = false;
-                    submitButton.textContent = '処理を開始する';
-                }
-            } catch (error) {
-                // ネットワークエラーなどの場合
-                alert('通信エラーが発生しました。ネットワーク接続を確認してください。\n' + error.message);
-                console.error('Network error:', error);
-
-                // ローディングオーバーレイを非表示にし、ボタンをリセット
-                loadingOverlay.style.display = 'none';
-                submitButton.disabled = false;
-                submitButton.textContent = '処理を開始する';
-            }
-        });
-
-        // ページが「戻る」ボタンなどでキャッシュから復元された場合に、ローディング状態をリセット
-        window.addEventListener('pageshow', function(event) {
-            if (event.persisted) { // ページがキャッシュから復元された場合
-                loadingOverlay.style.display = 'none';
-                submitButton.disabled = false;
-                submitButton.textContent = '処理を開始する';
-                // ファイルリストもリセット
-                selectedExcelFile = null;
-                selectedPdfFiles = [];
-                excelFileList.innerHTML = '';
-                pdfFileList.innerHTML = '';
-                updateSubmitButtonState();
-            }
-        });
-    </script>
-</body>
-</html>
+                    submitButton.disabled = fal
