@@ -259,60 +259,63 @@ def upload_and_process():
                     lines = page_data['text'].split('\n')
                     consumed_lines_indices = set() # 抽出に使用した行のインデックスを記録
 
-                    # タイトル（例: "YYYY年M月出勤簿"）を検索
-                    for i, line in enumerate(lines):
+                    # 1. タイトル（例: "YYYY年M月出勤簿"）を検索
+                    # 最初の数行を優先的にチェック (54行目付近にあるという情報から)
+                    for i, line in enumerate(lines[:15]): # 最初の15行程度をチェック範囲に拡大
                         match_title = re.search(r'(\d{4}年\d{1,2}月出勤簿)', line)
                         if match_title:
                             extracted_title = match_title.group(1).strip()
                             consumed_lines_indices.add(i)
                             break
-
-                    # 名前（氏名）と役割（雇用形態）を検索
-                    # 氏名が見つかった行、またはその周辺から情報を取得
+                    
+                    # 2. 名前と役割を検索
+                    # 55行目付近に名前、56行目付近に役割があるという情報から、
+                    # 全ての行をチェックし、キーワードを優先的に探す
                     for i, line in enumerate(lines):
-                        if i in consumed_lines_indices: continue
+                        if i in consumed_lines_indices: continue # 既に消費された行はスキップ
 
-                        if "氏名" in line:
-                            if "氏名：" in line:
-                                extracted_name = line.split("氏名：", 1)[1].strip()
+                        # 役割（雇用形態）を先に検索 (より具体的なキーワード)
+                        # "保育園名 正社員" のような形式を想定し、キーワードのみを抽出
+                        role_keywords = ["正社員", "パート", "園長", "保育士"]
+                        for role_kw in role_keywords:
+                            if role_kw in line:
+                                # 保育園名を除外するために、キーワードのみを抽出
+                                extracted_role = role_kw
                                 consumed_lines_indices.add(i)
-                            else:
-                                # "氏名"のみの場合、その後のテキストや次の行を試す
-                                parts = line.split("氏名", 1)
-                                if len(parts) > 1 and parts[1].strip():
-                                    extracted_name = parts[1].strip().split(' ')[0]
-                                    consumed_lines_indices.add(i)
-                                elif i + 1 < len(lines):
-                                    next_line = lines[i+1].strip()
-                                    # 次の行が名前である可能性をチェック（他のキーワードを含まない場合）
-                                    if next_line and not re.search(r'^\d{4}年\d{1,2}月', next_line) and \
-                                       not any(kw in next_line for kw in ["正社員", "パート", "園長", "出勤簿", "表"]):
-                                        extracted_name = next_line.split(' ')[0]
-                                        consumed_lines_indices.add(i+1)
-                                        consumed_lines_indices.add(i)
-                            
-                            # 名前が見つかった後、同じ行または周辺で役割を検索
-                            if "正社員" in line: extracted_role = "正社員"
-                            elif "パート" in line: extracted_role = "パート"
-                            elif "園長" in line: extracted_role = "園長"
-                            
-                            # 役割がまだ見つからない場合、次の数行をチェック
-                            if not extracted_role:
-                                for j in range(i, min(i+3, len(lines))): # 現在の行と次の2行をチェック
-                                    if j in consumed_lines_indices: continue
-                                    if "正社員" in lines[j]:
-                                        extracted_role = "正社員"
-                                        consumed_lines_indices.add(j)
-                                        break
-                                    elif "パート" in lines[j]:
-                                        extracted_role = "パート"
-                                        consumed_lines_indices.add(j)
-                                        break
-                                    elif "園長" in lines[j]:
-                                        extracted_role = "園長"
-                                        consumed_lines_indices.add(j)
-                                        break
-                            break # 氏名が見つかったので、名前と役割の検索ループを抜ける
+                                # 役割が見つかったら、その行は役割として消費されたとみなし、
+                                # 同じ行で名前を再検索しないようにする
+                                break 
+                        
+                        # 役割がこの行で見つかった場合、この行での名前検索はスキップ
+                        if extracted_role and i in consumed_lines_indices:
+                            continue 
+
+                        # 名前を検索
+                        # "氏名：山田太郎" または "山田太郎" のような形式を想定
+                        # "数字だけの年月日と漢字を含めて 年月日の期間との間に入っている" に対応するため、
+                        # 日付パターンを除外し、漢字・ひらがな・カタカナの連続を名前と見なす
+                        
+                        # "氏名："に続く名前を優先
+                        # 日本語文字（漢字、ひらがな、カタカナ）と一部の記号（スペース、中点など）を許容
+                        match_shimei = re.search(r'氏名[:：\s]*([\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uFF00-\uFFEF\s・ー]{2,})', line)
+                        if match_shimei:
+                            potential_name = match_shimei.group(1).strip()
+                            # 抽出された名前が日付や役割キーワードを含まないか最終確認
+                            if not re.search(r'\d{4}年|\d{1,2}月|\d{1,2}日|正社員|パート|園長|保育士', potential_name):
+                                extracted_name = potential_name
+                                consumed_lines_indices.add(i)
+                                break # 名前が見つかったらこの行の名前検索は終了
+
+                        # "氏名"のキーワードがない場合、日付や役割キーワードを含まない日本語の文字列を探す
+                        # ただし、すでにタイトルや役割を抽出した行はスキップ
+                        if not extracted_name and not re.search(r'\d{4}年|\d{1,2}月|\d{1,2}日|正社員|パート|園長|保育士', line):
+                            # 日本語文字の連続を名前と見なす（2文字以上）
+                            # より厳密に、数字や英字、一般的な記号を含まない日本語の塊を探す
+                            match_name_jp = re.search(r'^([\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uFF00-\uFFEF\s・ー]{2,})$', line.strip())
+                            if match_name_jp:
+                                extracted_name = match_name_jp.group(1).strip()
+                                consumed_lines_indices.add(i)
+                                break # 名前が見つかったらこの行の名前検索は終了
 
                     # 抽出に使われなかった残りのテキスト行を収集
                     for i, line in enumerate(lines):
@@ -323,9 +326,12 @@ def upload_and_process():
                 page_data['text'] = '\n'.join(remaining_text_lines) if remaining_text_lines else ''
 
                 # --- 抽出した情報をExcelシートの特定セルに配置 ---
-                new_sheet.cell(row=1, column=1, value=extracted_title) # A1セルにタイトル
-                new_sheet.cell(row=2, column=1, value=extracted_name)  # A2セルに名前
-                new_sheet.cell(row=2, column=3, value=extracted_role)  # C2セルに役割
+                # A1セルにタイトル
+                new_sheet.cell(row=1, column=1, value=extracted_title) 
+                # A2セルに名前
+                new_sheet.cell(row=2, column=1, value=extracted_name)  
+                # C2セルに役割
+                new_sheet.cell(row=2, column=3, value=extracted_role)  
 
                 # 以降のコンテンツ（表や残りのテキスト）の開始行を調整
                 # A1, A2, C2のために2行使用したので、3行目以降から開始
