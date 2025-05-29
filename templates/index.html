@@ -1,312 +1,262 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PDF to Excel Converter</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="icon" href="/static/images/icon.png" type="image/png">
-</head>
-<body>
-    <div class="header">
-        <img src="/static/images/logo.png" alt="Logo">
-        <div>
-            <h1 class="title">PDF to Excel 変換ツール</h1>
-            <p class="subtitle">【保育室】【病児・一時】の勤務時間を自動で計算</p>
-        </div>
-    </div>
+/* static/css/style.css */
 
-    <form id="uploadForm" method="post" enctype="multipart/form-data">
-        <div class="upload-areas-container">
-            <div id="drop-area-excel" class="card upload-area">
-                <div class="upload-icon">
-                    <i class="fa-solid fa-file-excel"></i>
-                </div>
-                <h2>シフト表 (Excel) をドラッグ & ドロップ</h2>
-                <p>または</p>
-                <input type="file" id="excelFileInput" name="excel_file" accept=".xls,.xlsx,.xlsm" style="display: none;">
-                <button type="button" class="btn btn-excel" onclick="document.getElementById('excelFileInput').click()">Excelファイルを選択</button>
-                <ul id="excelFileList" class="file-list"></ul>
-            </div>
+/* ページ全体 */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f7f6;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
 
-            <div id="drop-area-pdf" class="card upload-area">
-                <div class="upload-icon">
-                    <i class="fa-solid fa-file-pdf"></i>
-                </div>
-                <h2>出勤簿 (PDF) をドラッグ & ドロップ</h2>
-                <p>または</p>
-                <input type="file" id="pdfFileInput" name="pdf_files" accept=".pdf" multiple style="display: none;">
-                <button type="button" class="btn btn-pdf" onclick="document.getElementById('pdfFileInput').click()">PDFファイルを選択</button>
-                <ul id="pdfFileList" class="file-list"></ul>
-            </div>
-        </div>
+/* ヘッダー */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+    border-bottom: 1px solid #eee;
+    width: 100%;
+    max-width: 800px;
+    box-sizing: border-box;
+}
+.header img {
+    height: 60px;
+    margin-right: 15px;
+}
+.header .title {
+    margin: 0;
+    font-size: 1.8em;
+    color: #333;
+}
+.header .subtitle {
+    margin: 5px 0 0;
+    font-size: 1em;
+    color: #666;
+}
 
-        <button type="submit" id="submitButton" class="btn btn-process">処理を開始する</button>
-    </form>
+/* カード（アップロードエリア） */
+.card {
+    background-color: white;
+    padding: 20px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 20px; /* upload-areas-containerでgapが設定されるため、単独のカードにbottomは不要になる可能性あり */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: border-color 0.3s ease;
+    width: 100%;
+    max-width: 600px; /* このmax-widthは個別のカードには維持 */
+    box-sizing: border-box;
+}
 
-    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
-        <div class="spinner"></div>
-        <p>処理中です。しばらくお待ちください...</p>
-        <p>（ファイルのサイズやサーバーの状況により時間がかかる場合があります）</p>
-    </div>
+/* ドロップエリア強調 */
+.card.highlight {
+    border-color: #3498db;
+    background-color: #f0faff;
+}
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const excelDropArea = document.getElementById('drop-area-excel');
-            const pdfDropArea = document.getElementById('drop-area-pdf');
-            const excelFileInput = document.getElementById('excelFileInput');
-            const pdfFileInput = document.getElementById('pdfFileInput');
-            const excelFileList = document.getElementById('excelFileList');
-            const pdfFileList = document.getElementById('pdfFileList');
-            const uploadForm = document.getElementById('uploadForm');
-            const submitButton = document.getElementById('submitButton');
-            const loadingOverlay = document.getElementById('loadingOverlay');
+/* アップロードアイコンとテキスト */
+.upload-icon {
+    font-size: 4em; /* この4emは少し大きいかもしれません。 */
+    margin-bottom: 12px;
+}
+/* 個別のアイコンサイズは既に調整済みのため、これは不要か */
+/* .upload-icon i { font-size: 1.5em; margin-bottom: 10px; } */
 
-            console.log('DOMContentLoaded: Elements acquired.', {
-                uploadForm: uploadForm,
-                submitButton: submitButton
-            }); // 要素が取得できたか確認
+#drop-area-excel .upload-icon i {
+    font-size: 1.5em; /* アイコンサイズを個別に調整 */
+    margin-bottom: 10px;
+    color: #27ae60; /* Excelらしい緑色 */
+}
+#drop-area-pdf .upload-icon i {
+    font-size: 1.5em; /* アイコンサイズを個別に調整 */
+    margin-bottom: 10px;
+    color: #e74c3c; /* PDFらしい赤色 */
+}
+.upload-area h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    color: #333;
+}
+.upload-area p {
+    color: #666;
+    font-size: 0.875rem;
+    margin-top: 5px;
+}
 
-            let selectedExcelFile = null;
-            let selectedPdfFiles = [];
+/* ボタン共通 */
+.btn {
+    display: inline-block;
+    margin: 10px 0;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
 
-            // --- ファイルリスト表示と削除機能 ---
-            function displayFile(file, fileListElement, type) {
-                const listItem = document.createElement('li');
-                const iconClass = type === 'excel' ? 'fa-file-excel' : 'fa-file-pdf';
-                const iconColor = type === 'excel' ? 'color: #27ae60;' : 'color: #e74c3c;';
+/* Excel選択ボタン */
+.btn-excel {
+    background-color: #27ae60;
+    color: white;
+}
+.btn-excel:hover {
+    background-color: #229954;
+}
 
-                listItem.innerHTML = `
-                    <span class="info">
-                        <i class="fa-solid ${iconClass}" style="${iconColor}"></i>
-                        ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                    <button type="button" class="btn-remove" data-filename="${file.name}" data-type="${type}">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                `;
-                fileListElement.appendChild(listItem);
+/* PDF選択ボタン */
+.btn-pdf {
+    background-color: #e74c3c;
+    color: white;
+}
+.btn-pdf:hover {
+    background-color: #c0392b;
+}
 
-                // 削除ボタンのイベントリスナー
-                listItem.querySelector('.btn-remove').addEventListener('click', function() {
-                    const filenameToRemove = this.dataset.filename;
-                    const fileType = this.dataset.type;
+/* 選択ファイルリスト */
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 600px; /* ここも card の max-width に合わせるのが自然 */
+    border: 1px solid #eee;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.file-list li {
+    background-color: #f9f9f9;
+    padding: 10px 15px;
+    margin-bottom: 0px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.file-list li:last-child {
+    border-bottom: none;
+}
+.file-list .info {
+    flex-grow: 1;
+    text-align: left;
+    font-size: 0.9em;
+    color: #333;
+}
+.file-list .info .fa-solid,
+.file-list .info .fa-regular {
+    margin-right: 8px;
+    color: #555;
+}
 
-                    if (fileType === 'excel') {
-                        selectedExcelFile = null;
-                        excelFileList.innerHTML = ''; // Excelは1つだけなのでクリア
-                    } else {
-                        selectedPdfFiles = selectedPdfFiles.filter(f => f.name !== filenameToRemove);
-                        // 削除された要素をDOMからも削除
-                        this.closest('li').remove(); 
-                    }
-                    updateSubmitButtonState();
-                });
-                updateSubmitButtonState();
-            }
+/* ファイル削除ボタン */
+.btn-remove {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 1.2em;
+    cursor: pointer;
+    margin-left: 10px;
+    padding: 5px;
+    border-radius: 3px;
+}
+.btn-remove:hover {
+    color: #c0392b;
+    background-color: #fbe0e0;
+}
 
-            // --- ドラッグ＆ドロップ処理 ---
-            function setupDropArea(dropArea, fileInput, fileListElement, isMultiple) {
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    dropArea.addEventListener(eventName, preventDefaults, false);
-                });
+/* 処理開始ボタン */
+.btn-process {
+    width: 100%;
+    max-width: 600px;
+    padding: 12px 25px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-top: 20px;
+    transition: background-color 0.3s ease;
+    box-sizing: border-box;
+    /* ★★★ ここから変更 ★★★ */
+    display: block; /* margin: auto を機能させるために必要 */
+    margin-left: auto;
+    margin-right: auto;
+    /* ★★★ ここまで変更 ★★★ */
+}
+.btn-process:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+.btn-process:disabled {
+    background-color: #a0a0a0;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
 
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
-                });
+/* エラーメッセージ (error.html用) */
+.error-message {
+    color: #e74c3c;
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
 
-                ['dragleave', 'drop'].forEach(eventName => {
-                    dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
-                });
+/* エラーページのボディスタイル (error.html用) */
+body.error-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f4f7f6;
+    padding: 0;
+}
+.error-page .card {
+    max-width: 500px;
+    padding: 30px;
+    margin: 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
 
-                dropArea.addEventListener('drop', e => {
-                    const dt = e.dataTransfer;
-                    const files = dt.files;
-                    handleFiles(files, fileInput, fileListElement, isMultiple);
-                }, false);
-            }
+/* upload-areas-container のスタイル */
+.upload-areas-container {
+    display: flex; /* Flexboxを有効にする */
+    flex-direction: column; /* デフォルトは縦並び (モバイルファースト) */
+    gap: 20px; /* 各アップロードエリア間の隙間 */
+    width: 100%;
+    max-width: 800px; /* 全体の最大幅を調整 */
+    margin-bottom: 20px; /* 処理開始ボタンとの間隔 */
+}
 
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
+/* 768px以上の画面幅で横並びにする */
+@media (min-width: 768px) {
+    .upload-areas-container {
+        flex-direction: row; /* 横並びにする */
+        justify-content: space-between; /* 要素間にスペースを均等に配置 */
+        align-items: flex-start; /* 上端を揃える */
+    }
 
-            function handleFiles(files, fileInput, fileListElement, isMultiple) {
-                if (!isMultiple) {
-                    // 単一ファイルの場合、既存のファイルをクリア
-                    fileListElement.innerHTML = '';
-                    selectedExcelFile = null;
-                }
+    .upload-areas-container .card {
+        flex: 1; /* 利用可能なスペースを均等に分配 */
+        margin: 0 10px; /* 左右に少し余白 */
+        max-width: calc(50% - 20px); /* 50%幅からマージンを引く */
+    }
 
-                for (const file of files) {
-                    // 許可された拡張子かチェック
-                    const ext = file.name.split('.').pop().toLowerCase();
-                    const allowedExts = fileInput.accept.split(',').map(e => e.replace('.', ''));
-                    if (!allowedExts.includes(ext)) {
-                        alert(`許可されていないファイル形式です: ${file.name}`);
-                        continue;
-                    }
-
-                    if (!isMultiple) { // Excel (単一)
-                        selectedExcelFile = file;
-                        console.log('Selected Excel File:', selectedExcelFile.name, selectedExcelFile.size); // デバッグ用
-                        displayFile(file, fileListElement, 'excel');
-                    } else { // PDF (複数)
-                        // 既にリストにあるかチェック (ファイル名とサイズでユニーク性を判断)
-                        if (!selectedPdfFiles.some(f => f.name === file.name && f.size === file.size)) {
-                            selectedPdfFiles.push(file);
-                            console.log('Selected PDF Files:', selectedPdfFiles.map(f => f.name)); // デバッグ用
-                            displayFile(file, fileListElement, 'pdf');
-                        }
-                    }
-                }
-                updateSubmitButtonState();
-            }
-
-            // --- ファイル入力フィールドの変更イベント ---
-            excelFileInput.addEventListener('change', e => {
-                handleFiles(e.target.files, excelFileInput, excelFileList, false);
-            });
-
-            pdfFileInput.addEventListener('change', e => {
-                handleFiles(e.target.files, pdfFileInput, pdfFileList, true);
-            });
-
-            // --- ボタンの有効/無効状態を更新 ---
-            function updateSubmitButtonState() {
-                console.log('Updating submit button state...'); // デバッグ用
-                console.log('selectedExcelFile:', selectedExcelFile ? selectedExcelFile.name : 'None'); // デバッグ用
-                console.log('selectedPdfFiles.length:', selectedPdfFiles.length); // デバッグ用
-
-                if (selectedExcelFile && selectedPdfFiles.length > 0) {
-                    submitButton.disabled = false;
-                    console.log('Submit button enabled.'); // デバッグ用
-                } else {
-                    submitButton.disabled = true;
-                    console.log('Submit button disabled.'); // デバッグ用
-                }
-            }
-
-            // 初期状態でボタンの状態を更新
-            updateSubmitButtonState();
-
-            // ドロップエリアのセットアップ
-            setupDropArea(excelDropArea, excelFileInput, excelFileList, false);
-            setupDropArea(pdfDropArea, pdfFileInput, pdfFileList, true);
-
-            // --- フォーム送信 (AJAX) ---
-            // フォームのsubmitイベントをリッスン
-            uploadForm.addEventListener('submit', async function(event) {
-                console.log('--- Form submit event triggered. ---'); // デバッグ用
-                event.preventDefault(); // デフォルトのフォーム送信をキャンセル
-
-                // ローディングオーバーレイを表示
-                loadingOverlay.style.display = 'flex';
-                // 処理開始ボタンを無効化し、テキストを変更
-                submitButton.disabled = true;
-                submitButton.textContent = '処理中...';
-
-                const formData = new FormData();
-                if (selectedExcelFile) {
-                    formData.append('excel_file', selectedExcelFile);
-                    console.log('Appending Excel file to FormData:', selectedExcelFile.name); // デバッグ用
-                } else {
-                    console.warn('No Excel file selected. Submission aborted.'); // デバッグ用
-                    alert('Excelファイルが選択されていません。');
-                    resetUIOnFailure(); // UIをリセット
-                    return; // 処理を中断
-                }
-                if (selectedPdfFiles.length > 0) {
-                    selectedPdfFiles.forEach((file, index) => {
-                        formData.append('pdf_files', file);
-                        console.log(`Appending PDF file ${index + 1} to FormData:`, file.name); // デバッグ用
-                    });
-                } else {
-                    console.warn('No PDF files selected. Submission aborted.'); // デバッグ用
-                    alert('PDFファイルが選択されていません。');
-                    resetUIOnFailure(); // UIをリセット
-                    return; // 処理を中断
-                }
-
-
-                try {
-                    console.log('Initiating fetch request to /upload_and_process...'); // デバッグ用
-                    const response = await fetch('/upload_and_process', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    console.log('Fetch request completed. Response status:', response.status); // デバッグ用
-
-                    if (response.ok) {
-                        console.log('Response OK. Processing download...'); // デバッグ用
-                        // ファイル名を取得 (Content-Dispositionヘッダーから)
-                        const contentDisposition = response.headers.get('Content-Disposition');
-                        let filename = 'processed_template.xlsm'; // デフォルトのファイル名
-                        if (contentDisposition && contentDisposition.includes('filename=')) {
-                            const filenameMatch = /filename\*?=['"]?(?:UTF-8'')?([^;"]+)/.exec(contentDisposition);
-                            if (filenameMatch && filenameMatch[1]) {
-                                filename = decodeURIComponent(filenameMatch[1]);
-                                console.log('Extracted filename from Content-Disposition:', filename); // デバッグ用
-                            }
-                        }
-
-                        // ファイルをBlobとして取得
-                        const blob = await response.blob();
-                        
-                        // ダウンロードリンクを作成し、クリックしてダウンロードをトリガー
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = url;
-                        a.download = filename; // 取得したファイル名を設定
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url); // オブジェクトURLを解放
-                        console.log('File download triggered.'); // デバッグ用
-
-                        // 成功したらファイルをクリア
-                        selectedExcelFile = null;
-                        selectedPdfFiles = [];
-                        excelFileList.innerHTML = '';
-                        pdfFileList.innerHTML = '';
-                        updateSubmitButtonState(); // ボタンの状態を再度更新
-                        console.log('File lists cleared.'); // デバッグ用
-
-                    } else {
-                        console.error('Response not OK. Handling error...'); // デバッグ用
-                        const errorText = await response.text();
-                        alert('ファイル処理中にエラーが発生しました。\n詳細はコンソールを確認してください。\n' + errorText);
-                        console.error('Server error:', response.status, errorText);
-                    }
-                } catch (error) {
-                    console.error('Network or other error during fetch:', error); // デバッグ用
-                    alert('通信エラーが発生しました。ネットワーク接続を確認してください。\n' + error.message);
-                } finally {
-                    // 処理の成功・失敗に関わらずUIをリセット
-                    resetUIOnFailure(); // 最終的なUIリセット関数を呼び出し
-                }
-            });
-
-            // 処理失敗時または完了時にUIをリセットする共通関数
-            function resetUIOnFailure() {
-                loadingOverlay.style.display = 'none';
-                submitButton.disabled = false;
-                submitButton.textContent = '処理を開始する';
-                console.log('UI reset complete.');
-            }
-
-            // ページが「戻る」ボタンなどでキャッシュから復元された場合に、ローディング状態をリセット
-            window.addEventListener('pageshow', function(event) {
-                if (event.persisted) { // ページがキャッシュから復元された場合
-                    console.log('Page restored from cache. Resetting UI...'); // デバッグ用
-                    selectedExcelFile = null;
-                    selectedPdfFiles = [];
-                    excelFileList.innerHTML = '';
-                    pdfFileList.innerHTML = '';
-                    updateSubmitButtonState();
-                    resetUIOnFailure(); // UIを完全にリセット
-                }
-            });
-        });
-    </script>
-</body>
-</html>
+    /* 最初のカードの左マージンと最後のカードの右マージンを調整 */
+    .upload-areas-container .card:first-child {
+        margin-left: 0;
+    }
+    .upload-areas-container .card:last-child {
+        margin-right: 0;
+    }
+}
