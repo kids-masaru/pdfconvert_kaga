@@ -59,6 +59,11 @@
             const submitButton = document.getElementById('submitButton');
             const loadingOverlay = document.getElementById('loadingOverlay');
 
+            console.log('DOMContentLoaded: Elements acquired.', {
+                uploadForm: uploadForm,
+                submitButton: submitButton
+            }); // 要素が取得できたか確認
+
             let selectedExcelFile = null;
             let selectedPdfFiles = [];
 
@@ -187,8 +192,9 @@
             setupDropArea(pdfDropArea, pdfFileInput, pdfFileList, true);
 
             // --- フォーム送信 (AJAX) ---
+            // フォームのsubmitイベントをリッスン
             uploadForm.addEventListener('submit', async function(event) {
-                console.log('Form submit event triggered.'); // デバッグ用
+                console.log('--- Form submit event triggered. ---'); // デバッグ用
                 event.preventDefault(); // デフォルトのフォーム送信をキャンセル
 
                 // ローディングオーバーレイを表示
@@ -202,15 +208,23 @@
                     formData.append('excel_file', selectedExcelFile);
                     console.log('Appending Excel file to FormData:', selectedExcelFile.name); // デバッグ用
                 } else {
-                    console.warn('No Excel file selected.'); // デバッグ用
+                    console.warn('No Excel file selected. Submission aborted.'); // デバッグ用
+                    alert('Excelファイルが選択されていません。');
+                    resetUIOnFailure(); // UIをリセット
+                    return; // 処理を中断
                 }
-                selectedPdfFiles.forEach((file, index) => {
-                    formData.append('pdf_files', file);
-                    console.log(`Appending PDF file ${index + 1} to FormData:`, file.name); // デバッグ用
-                });
-                if (selectedPdfFiles.length === 0) {
-                    console.warn('No PDF files selected.'); // デバッグ用
+                if (selectedPdfFiles.length > 0) {
+                    selectedPdfFiles.forEach((file, index) => {
+                        formData.append('pdf_files', file);
+                        console.log(`Appending PDF file ${index + 1} to FormData:`, file.name); // デバッグ用
+                    });
+                } else {
+                    console.warn('No PDF files selected. Submission aborted.'); // デバッグ用
+                    alert('PDFファイルが選択されていません。');
+                    resetUIOnFailure(); // UIをリセット
+                    return; // 処理を中断
                 }
+
 
                 try {
                     console.log('Initiating fetch request to /upload_and_process...'); // デバッグ用
@@ -247,61 +261,47 @@
                         window.URL.revokeObjectURL(url); // オブジェクトURLを解放
                         console.log('File download triggered.'); // デバッグ用
 
-                        // ローディングオーバーレイを非表示にし、ボタンをリセット
-                        loadingOverlay.style.display = 'none';
-                        submitButton.disabled = false;
-                        submitButton.textContent = '処理を開始する';
-                        console.log('Loading overlay hidden, button reset.'); // デバッグ用
-                        
-                        // ファイルリストもクリア
+                        // 成功したらファイルをクリア
                         selectedExcelFile = null;
                         selectedPdfFiles = [];
                         excelFileList.innerHTML = '';
                         pdfFileList.innerHTML = '';
-                        updateSubmitButtonState();
+                        updateSubmitButtonState(); // ボタンの状態を再度更新
                         console.log('File lists cleared.'); // デバッグ用
 
                     } else {
                         console.error('Response not OK. Handling error...'); // デバッグ用
-                        // エラーレスポンスの場合
-                        const errorText = await response.text(); // エラーテキストをそのまま取得
-                        // エラーページにリダイレクトするか、アラートで表示
-                        // 今回はアラートで表示し、より詳細なエラーはコンソールに出力
-                        alert('ファイル処理中にエラーが発生しました。\n詳細はコンソールを確認してください。');
+                        const errorText = await response.text();
+                        alert('ファイル処理中にエラーが発生しました。\n詳細はコンソールを確認してください。\n' + errorText);
                         console.error('Server error:', response.status, errorText);
-                        
-                        // ローディングオーバーレイを非表示にし、ボタンをリセット
-                        loadingOverlay.style.display = 'none';
-                        submitButton.disabled = false;
-                        submitButton.textContent = '処理を開始する';
-                        console.log('Error: Loading overlay hidden, button reset.'); // デバッグ用
                     }
                 } catch (error) {
                     console.error('Network or other error during fetch:', error); // デバッグ用
-                    // ネットワークエラーなどの場合
                     alert('通信エラーが発生しました。ネットワーク接続を確認してください。\n' + error.message);
-
-                    // ローディングオーバーレイを非表示にし、ボタンをリセット
-                    loadingOverlay.style.display = 'none';
-                    submitButton.disabled = false;
-                    submitButton.textContent = '処理を開始する';
-                    console.log('Catch block: Loading overlay hidden, button reset.'); // デバッグ用
+                } finally {
+                    // 処理の成功・失敗に関わらずUIをリセット
+                    resetUIOnFailure(); // 最終的なUIリセット関数を呼び出し
                 }
             });
+
+            // 処理失敗時または完了時にUIをリセットする共通関数
+            function resetUIOnFailure() {
+                loadingOverlay.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.textContent = '処理を開始する';
+                console.log('UI reset complete.');
+            }
 
             // ページが「戻る」ボタンなどでキャッシュから復元された場合に、ローディング状態をリセット
             window.addEventListener('pageshow', function(event) {
                 if (event.persisted) { // ページがキャッシュから復元された場合
                     console.log('Page restored from cache. Resetting UI...'); // デバッグ用
-                    loadingOverlay.style.display = 'none';
-                    submitButton.disabled = false;
-                    submitButton.textContent = '処理を開始する';
-                    // ファイルリストもリセット
                     selectedExcelFile = null;
                     selectedPdfFiles = [];
                     excelFileList.innerHTML = '';
                     pdfFileList.innerHTML = '';
                     updateSubmitButtonState();
+                    resetUIOnFailure(); // UIを完全にリセット
                 }
             });
         });
