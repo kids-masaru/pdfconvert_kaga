@@ -248,4 +248,61 @@
 
                     // ローディングオーバーレイを非表示にし、ボタンをリセット
                     loadingOverlay.style.display = 'none';
-                    submitButton.disabled = fal
+                    submitButton.disabled = false;
+                    submitButton.textContent = '処理を開始する';
+                    console.log('Loading overlay hidden, button reset.'); // デバッグ用
+                    
+                    // ファイルリストもクリア
+                    selectedExcelFile = null;
+                    selectedPdfFiles = [];
+                    excelFileList.innerHTML = '';
+                    pdfFileList.innerHTML = '';
+                    updateSubmitButtonState();
+                    console.log('File lists cleared.'); // デバッグ用
+
+                } else {
+                    console.error('Response not OK. Handling error...'); // デバッグ用
+                    // エラーレスポンスの場合
+                    const errorText = await response.text(); // エラーテキストをそのまま取得
+                    // エラーページにリダイレクトするか、アラートで表示
+                    // 今回はアラートで表示し、より詳細なエラーはコンソールに出力
+                    alert('ファイル処理中にエラーが発生しました。\n詳細はコンソールを確認してください。');
+                    console.error('Server error:', response.status, errorText);
+                    
+                    // ローディングオーバーレイを非表示にし、ボタンをリセット
+                    loadingOverlay.style.display = 'none';
+                    submitButton.disabled = false;
+                    submitButton.textContent = '処理を開始する';
+                    console.log('Error: Loading overlay hidden, button reset.'); // デバッグ用
+                }
+            } catch (error) {
+                console.error('Network or other error during fetch:', error); // デバッグ用
+                // ネットワークエラーなどの場合
+                alert('通信エラーが発生しました。ネットワーク接続を確認してください。\n' + error.message);
+
+                // ローディングオーバーレイを非表示にし、ボタンをリセット
+                loadingOverlay.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.textContent = '処理を開始する';
+                console.log('Catch block: Loading overlay hidden, button reset.'); // デバッグ用
+            }
+        });
+
+        // ページが「戻る」ボタンなどでキャッシュから復元された場合に、ローディング状態をリセット
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) { // ページがキャッシュから復元された場合
+                console.log('Page restored from cache. Resetting UI...'); // デバッグ用
+                loadingOverlay.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.textContent = '処理を開始する';
+                // ファイルリストもリセット
+                selectedExcelFile = null;
+                selectedPdfFiles = [];
+                excelFileList.innerHTML = '';
+                pdfFileList.innerHTML = '';
+                updateSubmitButtonState();
+            }
+        });
+    </script>
+</body>
+</html>
