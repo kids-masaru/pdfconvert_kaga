@@ -295,8 +295,11 @@ def upload_and_process():
                         # 3. 名前を抽出
                         # 優先度順に試行
                         if not extracted_name: # まだ名前が抽出されていない場合のみ試行
-                            # 優先度1 (新規): ID番号に続く名前（例: "2025030040 日高 安澄"）
-                            match_id_name = re.search(r'^\s*\d{8,}\s*([\u3000-\u9FFF\uFF00-\uFFEF\s・ー]+?)\s*$', current_line)
+                            # 優先度1 (修正): 10桁のID番号に続く名前（例: "2025030040 日高 安澄"）
+                            # ID番号の後に日本語の名前があり、その後には日付情報が続く可能性があることを考慮
+                            match_id_name = re.search(
+                                r'^\s*\d{10}\s*([\u3000-\u9FFF\uFF00-\uFFEF\s・ー]+?)(?:\s+\d{4}年|\s*$)', current_line
+                            )
                             if match_id_name:
                                 potential_name = match_id_name.group(1).strip()
                                 # 抽出された名前が日付や役割/タイトルキーワードを含まないか最終確認
