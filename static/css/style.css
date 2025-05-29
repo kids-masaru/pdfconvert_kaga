@@ -49,7 +49,7 @@ body {
     border: 2px dashed #ccc;
     border-radius: 8px;
     text-align: center;
-    margin-bottom: 20px; /* upload-areas-containerでgapが設定されるため、単独のカードにbottomは不要になる可能性あり */
+    margin-bottom: 20px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     transition: border-color 0.3s ease;
     width: 100%;
@@ -65,19 +65,16 @@ body {
 
 /* アップロードアイコンとテキスト */
 .upload-icon {
-    font-size: 4em; /* この4emは少し大きいかもしれません。 */
+    font-size: 4em;
     margin-bottom: 12px;
 }
-/* 個別のアイコンサイズは既に調整済みのため、これは不要か */
-/* .upload-icon i { font-size: 1.5em; margin-bottom: 10px; } */
-
 #drop-area-excel .upload-icon i {
-    font-size: 1.5em; /* アイコンサイズを個別に調整 */
+    font-size: 1.5em;
     margin-bottom: 10px;
     color: #27ae60; /* Excelらしい緑色 */
 }
 #drop-area-pdf .upload-icon i {
-    font-size: 1.5em; /* アイコンサイズを個別に調整 */
+    font-size: 1.5em;
     margin-bottom: 10px;
     color: #e74c3c; /* PDFらしい赤色 */
 }
@@ -85,6 +82,11 @@ body {
     margin: 0;
     font-size: 1.125rem;
     color: #333;
+    /* ★★★ ここから変更 ★★★ */
+    white-space: nowrap; /* テキストの改行を禁止 */
+    overflow: hidden; /* はみ出した部分を非表示 */
+    text-overflow: ellipsis; /* はみ出した部分を「...」で表示 */
+    /* ★★★ ここまで変更 ★★★ */
 }
 .upload-area p {
     color: #666;
@@ -128,7 +130,7 @@ body {
     padding: 0;
     margin-top: 20px;
     width: 100%;
-    max-width: 600px; /* ここも card の max-width に合わせるのが自然 */
+    max-width: 600px;
     border: 1px solid #eee;
     border-radius: 8px;
     max-height: 200px;
@@ -189,11 +191,9 @@ body {
     margin-top: 20px;
     transition: background-color 0.3s ease;
     box-sizing: border-box;
-    /* ★★★ ここから変更 ★★★ */
-    display: block; /* margin: auto を機能させるために必要 */
+    display: block;
     margin-left: auto;
     margin-right: auto;
-    /* ★★★ ここまで変更 ★★★ */
 }
 .btn-process:hover:not(:disabled) {
     background-color: #2980b9;
