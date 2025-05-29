@@ -49,11 +49,11 @@ body {
     border: 2px dashed #ccc;
     border-radius: 8px;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 20px; /* upload-areas-containerでgapが設定されるため、単独のカードにbottomは不要になる可能性あり */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     transition: border-color 0.3s ease;
     width: 100%;
-    max-width: 600px;
+    max-width: 600px; /* このmax-widthは個別のカードには維持 */
     box-sizing: border-box;
 }
 
@@ -65,16 +65,19 @@ body {
 
 /* アップロードアイコンとテキスト */
 .upload-icon {
-    font-size: 4em;
+    font-size: 4em; /* この4emは少し大きいかもしれません。 */
     margin-bottom: 12px;
 }
+/* 個別のアイコンサイズは既に調整済みのため、これは不要か */
+/* .upload-icon i { font-size: 1.5em; margin-bottom: 10px; } */
+
 #drop-area-excel .upload-icon i {
-    font-size: 1.5em;
+    font-size: 1.5em; /* アイコンサイズを個別に調整 */
     margin-bottom: 10px;
     color: #27ae60; /* Excelらしい緑色 */
 }
 #drop-area-pdf .upload-icon i {
-    font-size: 1.5em;
+    font-size: 1.5em; /* アイコンサイズを個別に調整 */
     margin-bottom: 10px;
     color: #e74c3c; /* PDFらしい赤色 */
 }
@@ -125,7 +128,7 @@ body {
     padding: 0;
     margin-top: 20px;
     width: 100%;
-    max-width: 600px;
+    max-width: 600px; /* ここも card の max-width に合わせるのが自然 */
     border: 1px solid #eee;
     border-radius: 8px;
     max-height: 200px;
@@ -186,6 +189,11 @@ body {
     margin-top: 20px;
     transition: background-color 0.3s ease;
     box-sizing: border-box;
+    /* ★★★ ここから変更 ★★★ */
+    display: block; /* margin: auto を機能させるために必要 */
+    margin-left: auto;
+    margin-right: auto;
+    /* ★★★ ここまで変更 ★★★ */
 }
 .btn-process:hover:not(:disabled) {
     background-color: #2980b9;
@@ -219,6 +227,7 @@ body.error-page {
     margin: 0;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
+
 /* upload-areas-container のスタイル */
 .upload-areas-container {
     display: flex; /* Flexboxを有効にする */
